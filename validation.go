@@ -6,46 +6,59 @@ import "regexp"
 //
 // Rauthy's OpenAPI document does not carry them: it is generated with utoipa,
 // which does not emit the `validator` crate's ranges and regexes into the
-// schema. Every pattern and bound below is transcribed from Rauthy v0.36.2:
+// schema. The patterns and bounds below are transcribed from Rauthy v0.36.2:
 // src/common/src/regex.rs, src/api_types/src/cust_validation.rs and the
 // #[validate] attributes in src/api_types/src/clients.rs. Checking a value
 // against them before a request turns a server-side 400 into an error that
 // names the offending field.
+//
+// They are a transcription, not a guarantee of exact parity. One difference is
+// known: Go's `\s` matches ASCII whitespace only, while Rust's matches Unicode
+// whitespace, so a client name or group that contains non-ASCII whitespace is
+// accepted by Rauthy and rejected by ClientNamePattern and GroupPattern.
 
 // Patterns from src/common/src/regex.rs and cust_validation.rs.
 var (
-	// ClientIDPattern is RE_CLIENT_ID, the pattern of a client id. Rauthy 0.36
-	// narrowed it: `POST /clients` now rejects everything outside letters,
-	// digits, dot, underscore and hyphen, so ids that used to be legal
-	// (anything with `/`, `,`, `:` and friends) are refused by a live server.
-	ClientIDPattern = regexp.MustCompile(`^[a-zA-Z0-9._\-]{2,256}$`)
-
-	// ClientNamePattern is RE_CLIENT_NAME, the pattern of a client's display
-	// name. The CJK ranges are part of the upstream pattern.
-	ClientNamePattern = regexp.MustCompile(`^[a-zA-Z0-9À-ɏ\-\s` +
+	clientIDPattern   = regexp.MustCompile(`^[a-zA-Z0-9._\-]{2,256}$`)
+	clientNamePattern = regexp.MustCompile(`^[a-zA-Z0-9À-ɏ\-\s` +
 		`\x{3041}-\x{3096}\x{30A0}-\x{30FF}\x{3400}-\x{4DB5}\x{4E00}-\x{9FCB}` +
 		`\x{F900}-\x{FA6A}\x{2E80}-\x{2FD5}\x{FF66}-\x{FF9F}\x{FFA1}-\x{FFDC}\x{31F0}-\x{31FF}]{2,128}$`)
-
-	// URIPattern is RE_URI as applied to a client's redirect URIs and other
-	// URI-valued fields.
-	URIPattern = regexp.MustCompile(`^[a-zA-Z0-9,.:/_\-&?=~#!$'()*+%@]+$`)
-
-	// ScopePattern is RE_ROLES_SCOPES, used for a client's scopes and
-	// default_scopes. Rauthy applies the same pattern to role and scope names.
-	ScopePattern = regexp.MustCompile(`^[a-zA-Z0-9-_/,:*.]{2,64}$`)
-
-	// GroupPattern is RE_GROUPS, used for a client's groups prefix. Rauthy
-	// applies the same pattern to group names.
-	GroupPattern = regexp.MustCompile(`^[a-zA-Z0-9-_/,:*\s]{2,64}$`)
-
-	// OriginPattern is validate_vec_origin, the pattern of each allowed
-	// origin: scheme and host only, no path.
-	OriginPattern = regexp.MustCompile(`^(http|https)://[a-z0-9.:-]+$`)
-
-	// ContactPattern is validate_vec_contact, the pattern of each client
-	// contact.
-	ContactPattern = regexp.MustCompile(`^[a-zA-Z0-9+.@/-]{0,48}$`)
+	uriPattern     = regexp.MustCompile(`^[a-zA-Z0-9,.:/_\-&?=~#!$'()*+%@]+$`)
+	scopePattern   = regexp.MustCompile(`^[a-zA-Z0-9-_/,:*.]{2,64}$`)
+	groupPattern   = regexp.MustCompile(`^[a-zA-Z0-9-_/,:*\s]{2,64}$`)
+	originPattern  = regexp.MustCompile(`^(http|https)://[a-z0-9.:-]+$`)
+	contactPattern = regexp.MustCompile(`^[a-zA-Z0-9+.@/-]{0,48}$`)
 )
+
+// ClientIDPattern returns RE_CLIENT_ID, the pattern of a client id. Rauthy 0.36
+// narrowed it: `POST /clients` now rejects everything outside letters, digits,
+// dot, underscore and hyphen, so ids that used to be legal (anything with `/`,
+// `,`, `:` and friends) are refused by a live server.
+func ClientIDPattern() *regexp.Regexp { return clientIDPattern }
+
+// ClientNamePattern returns RE_CLIENT_NAME, the pattern of a client's display
+// name. The CJK ranges are part of the upstream pattern.
+func ClientNamePattern() *regexp.Regexp { return clientNamePattern }
+
+// URIPattern returns RE_URI as applied to a client's redirect URIs and other
+// URI-valued fields.
+func URIPattern() *regexp.Regexp { return uriPattern }
+
+// ScopePattern returns RE_ROLES_SCOPES, used for a client's scopes and
+// default_scopes. Rauthy applies the same pattern to role and scope names.
+func ScopePattern() *regexp.Regexp { return scopePattern }
+
+// GroupPattern returns RE_GROUPS, used for a client's groups prefix. Rauthy
+// applies the same pattern to group names.
+func GroupPattern() *regexp.Regexp { return groupPattern }
+
+// OriginPattern returns validate_vec_origin, the pattern of each allowed
+// origin: scheme and host only, no path.
+func OriginPattern() *regexp.Regexp { return originPattern }
+
+// ContactPattern returns validate_vec_contact, the pattern of each client
+// contact.
+func ContactPattern() *regexp.Regexp { return contactPattern }
 
 // Bounds from the #[validate(range(...))] attributes in
 // src/api_types/src/clients.rs, inclusive.
