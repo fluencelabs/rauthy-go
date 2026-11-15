@@ -278,6 +278,64 @@ func TestNew_DoesNotFollowRedirects(t *testing.T) {
 	}
 }
 
+// A refused redirect names where the server tried to send the call, as
+// scheme, host and path only: userinfo and the query may carry credentials.
+func TestRefusedRedirect_NamesTheLocation(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		location string
+		want     string
+		relative bool
+	}{
+		"absolute": {
+			location: "https://admin:hunter2@login.example.com/sso/start?token=abc#frag",
+			want:     "https://login.example.com/sso/start",
+		},
+		"relative":    {location: "/moved/here?token=abc", want: "/moved/here", relative: true},
+		"missing":     {location: "", want: "no Location"},
+		"unparseable": {location: "http://[::1", want: "does not parse"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var srvURL string
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				srvURL = "http://" + r.Host
+				if tc.location != "" {
+					w.Header().Set("Location", tc.location)
+				}
+				w.WriteHeader(http.StatusFound)
+				_, _ = io.WriteString(w, `<a href="`+tc.location+`">Found</a>`)
+			})
+
+			_, err := c.GetUser(t.Context(), "u1")
+			want := tc.want
+			if tc.relative {
+				want = srvURL + want
+			}
+			checkRedirectError(t, err, want)
+		})
+	}
+}
+
+func checkRedirectError(t *testing.T, err error, want string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatal("want error")
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("err = %q, want it to contain %q", err, want)
+	}
+	for _, secret := range []string{"hunter2", "token=abc", "frag"} {
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("err = %q leaks %q", err, secret)
+		}
+	}
+}
+
 // A caller-supplied client keeps its own redirect policy: New must not
 // rewrite it behind the caller's back.
 func TestWithHTTPClient_LeavesTheCallersClientAlone(t *testing.T) {

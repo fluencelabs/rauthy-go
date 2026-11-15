@@ -46,6 +46,9 @@ type rawResponse struct {
 	contentType string
 	status      int
 	retryAfter  string
+	// redirect replaces the body as the error message of a refused 3xx; it is
+	// empty for any other status.
+	redirect string
 }
 
 // buildError marks a request that could not be constructed at all, as opposed
@@ -79,7 +82,11 @@ func (c *Client) send(
 			return resp, nil
 		default:
 			status, retryAfter = resp.status, resp.retryAfter
-			lastErr = newAPIError(method, path, resp.status, resp.body)
+			apiErr := newAPIError(method, path, resp.status, resp.body)
+			if resp.redirect != "" {
+				apiErr.Message = resp.redirect
+			}
+			lastErr = apiErr
 		}
 
 		if attempt >= c.retry.maxAttempts || !c.retryable(method, path, status, err) {
@@ -119,6 +126,9 @@ func (c *Client) attempt(
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		if isUnparseableLocation(err) {
+			return nil, &redirectError{method: method, path: path}
+		}
 		return nil, fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -134,6 +144,7 @@ func (c *Client) attempt(
 		contentType: resp.Header.Get("Content-Type"),
 		status:      resp.StatusCode,
 		retryAfter:  resp.Header.Get("Retry-After"),
+		redirect:    redirectMessage(resp.StatusCode, req.URL, resp.Header.Get("Location")),
 	}, nil
 }
 
@@ -268,12 +279,15 @@ func retryableFailure(status int, err error) bool {
 }
 
 // isTransport separates a failed exchange from the failures that are ours or
-// that a retry cannot fix: a request we could not build, and an attempt that
-// ran out of time. The last covers both a context the
+// that a retry cannot fix: a request we could not build, a redirect we refused,
+// and an attempt that ran out of time. The last covers both a context the
 // caller ended and an http.Client timeout, which net/http also reports as
 // context.DeadlineExceeded; neither is retried (see retryable for why).
 func isTransport(err error) bool {
 	if _, ok := errors.AsType[*buildError](err); ok {
+		return false
+	}
+	if _, ok := errors.AsType[*redirectError](err); ok {
 		return false
 	}
 	return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
