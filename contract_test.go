@@ -11,8 +11,8 @@ import (
 
 	validator "github.com/pb33f/libopenapi-validator"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy/mock"
+	"github.com/fluencelabs/rauthy-go"
+	"github.com/fluencelabs/rauthy-go/mock"
 )
 
 // The contract tests validate the bodies this package sends, and the bodies it
@@ -38,7 +38,7 @@ func newContractValidator(t *testing.T) validator.Validator {
 	return v
 }
 
-// apiPath prefixes a spec path with the API base path the provider talks to.
+// apiPath prefixes a spec path with the API base path the client talks to.
 func apiPath(p string) string { return rauthy.APIBasePath + p }
 
 func validateRequest(t *testing.T, v validator.Validator, method, path string, body any) (bool, string) {
@@ -144,7 +144,7 @@ func TestContract_UpdateClientRequest(t *testing.T) {
 }
 
 // A PUT is a full replacement and Rauthy's deserializer requires these fields.
-// If a future spec makes them optional this test tells us the provider may stop
+// If a future spec makes them optional this test tells us the client may stop
 // sending them.
 func TestContract_UpdateClientRequiresEnabledAndFlows(t *testing.T) {
 	v := newContractValidator(t)
@@ -223,7 +223,7 @@ func TestContract_RotateSecretRequest(t *testing.T) {
 // is documented as "Value between 1 and 24" in prose but has only
 // `minimum: 0` machine-readable, and the lifetimes and algorithm patterns are
 // prose too. So the contract layer can police field sets and types but NOT
-// value ranges — those are guarded provider-side, and this test pins the
+// value ranges — those are guarded client-side (see validation.go), and this test pins the
 // assumption so we notice if a future Rauthy starts emitting them.
 func TestContract_SpecDoesNotCarryValueRanges(t *testing.T) {
 	v := newContractValidator(t)
@@ -438,8 +438,8 @@ func TestContract_AuthProviderResponse(t *testing.T) {
 // naming the scope field.
 //
 // Both forms satisfy the document, so the contract validator cannot see any of
-// this — which is exactly why it is written down here. The provider package
-// models the field as a set and converts in both directions.
+// this — which is exactly why it is written down here. A caller that
+// models the field as a set has to convert in both directions.
 func TestContract_AuthProviderScopeIsNotRoundTrippable(t *testing.T) {
 	v := newContractValidator(t)
 
@@ -564,7 +564,7 @@ func TestContract_CreatePamGroupResponse_SpecDivergence(t *testing.T) {
 		`{"id":100002,"name":"developers","typ":"generic"}`)
 	if ok {
 		t.Error("the spec now accepts a single group from POST /pam/groups; " +
-			"the create/list mix-up documented in rauthy/pam.go may be fixed — re-check it")
+			"the create/list mix-up documented in pam.go may be fixed — re-check it")
 	}
 }
 
@@ -579,7 +579,7 @@ func TestContract_CreatePamHostRequest_SpecDivergence(t *testing.T) {
 	})
 	if ok {
 		t.Error("the spec now describes POST /pam/hosts; " +
-			"the create operation documented as missing in rauthy/pam.go may be back — re-check it")
+			"the create operation documented as missing in pam.go may be back — re-check it")
 	}
 }
 
@@ -601,7 +601,7 @@ func TestContract_PamHostAddresses_SpecDivergence(t *testing.T) {
 	})
 	if ok {
 		t.Error("the spec now accepts an array for PamHostUpdateRequest.ips; " +
-			"the string/array divergence documented in rauthy/pam.go may be fixed — re-check it")
+			"the string/array divergence documented in pam.go may be fixed — re-check it")
 	}
 
 	body := `{"id":"h1","hostname":"build01","gid":100001,"force_mfa":true,` +
@@ -642,8 +642,7 @@ func TestContract_APIKeyRequest(t *testing.T) {
 		Access: []rauthy.APIKeyAccess{
 			{Group: "Users", AccessRights: []string{"read", "create"}},
 			// An empty rights list is legal and has to stay legal: it is what
-			// the provider sends for a group the practitioner listed but gave
-			// nothing.
+			// a caller sends for a group it listed but gave nothing.
 			{Group: "ApiKeys", AccessRights: []string{}},
 		},
 	}

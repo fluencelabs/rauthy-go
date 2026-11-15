@@ -15,8 +15,8 @@ import (
 //
 // `typ` is deliberately absent. Rauthy's own OpenAPI document describes it as
 // "Currently ignored - will be implemented in a future version", and its only
-// enum member is `Email`, so sending it would be a no-op field that the
-// provider would then have to keep in state forever for compatibility.
+// enum member is `Email`, so sending it would be a no-op field that callers
+// would then have to keep supplying forever for compatibility.
 type UserAttrRequest struct {
 	Name         string          `json:"name"`
 	Desc         *string         `json:"desc,omitempty"`
@@ -54,13 +54,13 @@ const userAttrPathBase = "/users/attr"
 //
 // That is fatal here rather than merely untidy: a scope's attr_include_*
 // mapping is filtered against exactly that list, so a scope applied alongside
-// the attributes it maps silently loses them. And Terraform applies independent
-// resources in parallel — ten at a time by default — which makes overlapping
-// creates the normal case rather than an unlucky one.
+// the attributes it maps silently loses them. And callers such as Terraform
+// apply independent resources in parallel — ten at a time by default — which
+// makes overlapping creates the normal case rather than an unlucky one.
 //
 // Writes are therefore serialised through Client.userAttrMu. That covers this
-// process, which is all that can be covered: two `terraform apply` runs against
-// one instance can still race each other, and so can the Admin UI. Reads are
+// process, which is all that can be covered: two processes writing to one
+// instance can still race each other, and so can the Admin UI. Reads are
 // deliberately left unserialised — they do not mutate the list, and blocking
 // them would not make a concurrently corrupted list any more accurate.
 //
@@ -112,7 +112,7 @@ func (c *Client) GetUserAttr(ctx context.Context, name string) (*UserAttrRespons
 //
 // The attribute is addressed by its current name and the body carries the name
 // it should have afterwards, which reads like a rename — but is not one, and
-// the provider never uses it as one. Against a live Rauthy 0.35.2 a PUT that
+// the client never uses it as one. Against a live Rauthy 0.35.2 a PUT that
 // changes the name leaves the old name occupied: it disappears from
 // GET /users/attr, yet a later POST under it fails with "User attribute config
 // does already exist", so the name is unusable until someone deletes it by

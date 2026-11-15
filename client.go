@@ -17,7 +17,7 @@ import (
 )
 
 // APIBasePath is appended to the configured Rauthy URL. Callers configure the
-// provider with the bare instance URL (https://auth.example.com); the API base
+// client with the bare instance URL (https://auth.example.com); the API base
 // path is ours to know.
 const APIBasePath = "/auth/v1"
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 const oneProviderJSON = `[{"id":"provider-1","name":"Example IdP","typ":"oidc","enabled":true,` +

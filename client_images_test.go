@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 func TestSniffImageMime(t *testing.T) {

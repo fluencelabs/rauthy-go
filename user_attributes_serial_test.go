@@ -8,14 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 // Rauthy rewrites the whole user attribute list on every write without locking,
 // so two overlapping writes lose one another — see the note in
 // user_attributes.go. The client serialises them; this pins that it really
 // does, because the symptom on a live instance is silent (a 200 and a missing
-// attribute) and Terraform creates independent resources ten at a time.
+// attribute) and callers such as Terraform write independent objects ten at a
+// time.
 func TestUserAttrWritesAreSerialised(t *testing.T) {
 	t.Parallel()
 

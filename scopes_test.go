@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 // The request carries the attribute mappings as arrays; the response returns

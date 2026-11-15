@@ -14,20 +14,20 @@ import (
 )
 
 // Retry defaults. Four attempts with a 200ms base spend under two seconds in
-// the worst case, which is short enough that a `terraform apply` does not look
-// hung and long enough to ride out a reverse proxy reloading or a Rauthy pod
+// the worst case, which is short enough that a caller (a `terraform apply`, say)
+// does not look hung and long enough to ride out a reverse proxy reloading or a Rauthy pod
 // being rescheduled.
 const (
 	defaultMaxAttempts = 4
 	defaultBaseDelay   = 200 * time.Millisecond
 	defaultMaxDelay    = 5 * time.Second
 	// A server asking us to wait longer than this is not having a blip, it is
-	// down. Failing the apply beats blocking the provider for a minute.
+	// down. Failing the call beats blocking the caller for a minute.
 	maxHonouredRetryAfter = 30 * time.Second
 )
 
-// retryPolicy bounds how hard the client tries. Only tests change it, through
-// WithRetryPolicy — see the note there for why it is not a provider attribute.
+// retryPolicy bounds how hard the client tries. Callers change it through
+// WithRetryPolicy.
 type retryPolicy struct {
 	maxAttempts int
 	baseDelay   time.Duration
@@ -135,9 +135,9 @@ func (c *Client) attempt(
 // zero when no response was received at all.
 //
 // The whole question is idempotency, and the cost of the two mistakes is not
-// symmetric: retrying too timidly fails an apply the operator can simply
+// symmetric: retrying too timidly fails a call the operator can simply
 // re-run, while retrying a create that actually succeeded leaves a duplicate
-// user behind that Terraform does not know about.
+// user behind that the caller does not know about.
 //
 // GET, PUT and DELETE are idempotent across this API — Rauthy's PUTs are full
 // replacements and its DELETEs answer the same way for an object that is

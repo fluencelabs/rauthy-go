@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 // retryTestPolicy shrinks the budget to something a test can afford. The point

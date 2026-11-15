@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 func TestContract_UserAttrRequest(t *testing.T) {
@@ -32,7 +32,7 @@ func TestContract_UserAttrRequest(t *testing.T) {
 }
 
 // default_value is `serde_json::Value` upstream, so anything that is JSON is a
-// legal default. The provider passes the configured document through untouched
+// legal default. The client passes the given document through untouched
 // and this pins that the spec really does allow more than a string.
 func TestContract_UserAttrRequestTakesAnyJSONDefault(t *testing.T) {
 	v := newContractValidator(t)
@@ -54,7 +54,7 @@ func TestContract_UserAttrRequestTakesAnyJSONDefault(t *testing.T) {
 	}
 }
 
-// Only the name is required; the provider relies on that when a configuration
+// Only the name is required; callers rely on that when a configuration
 // sets nothing but a name.
 func TestContract_UserAttrRequestNeedsOnlyAName(t *testing.T) {
 	v := newContractValidator(t)
@@ -122,7 +122,7 @@ func TestContract_UserAttrResponse(t *testing.T) {
 }
 
 // An attribute with no description and no default: both fields are nullable
-// upstream and the provider must cope with them being absent entirely.
+// upstream and the client must cope with them being absent entirely.
 func TestContract_UserAttrResponseWithoutOptionalFields(t *testing.T) {
 	v := newContractValidator(t)
 

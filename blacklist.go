@@ -69,7 +69,7 @@ func (c *Client) ListBlacklistedIPs(ctx context.Context) ([]BlacklistedIP, error
 // groups and scopes.
 //
 // Addresses are compared parsed rather than as strings: the caller holds the
-// spelling from the Terraform configuration and Rauthy holds its own canonical
+// spelling from its own configuration and Rauthy holds its own canonical
 // rendering, and `2001:0DB8::2` and `2001:db8::2` are the same host. An
 // unparseable value on either side falls back to a string comparison, which
 // cannot match anything Rauthy would have accepted but keeps the function total.
@@ -100,7 +100,7 @@ func sameIP(a, b string) bool {
 // The endpoint answers 200 whatever it is handed — an address that was never
 // blacklisted, or a path segment that is not an address at all. There is
 // therefore no 404 to distinguish "removed" from "was not there", which suits a
-// Terraform delete but makes this useless as an existence check.
+// declarative delete but makes this useless as an existence check.
 func (c *Client) DeleteBlacklistedIP(ctx context.Context, ip string) error {
 	return c.do(ctx, http.MethodDelete, blacklistPath(ip), nil, nil)
 }

@@ -1,0 +1,14 @@
+.direnv/
+.envrc.local
+.worktrees/
+
+# Go
+/bin/
+*.test
+*.out
+coverage.*
+
+# Working directories openapi-refresh.sh creates next to its output. They hold
+# generated config carrying throwaway secrets; a hard-killed run leaves one
+# behind, and it must not be committable.
+**/.openapi-refresh.*

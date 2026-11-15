@@ -56,7 +56,7 @@ func newAPIError(method, path string, status int, raw []byte) *APIError {
 // IsNotFound reports whether err is a 404 from the API.
 func IsNotFound(err error) bool { return hasStatus(err, http.StatusNotFound) }
 
-// IsForbidden reports whether err is a 403 from the API. For this provider a
+// IsForbidden reports whether err is a 403 from the API. For this client a
 // 403 almost always means the API key is missing an access-group right rather
 // than that the object is off limits.
 func IsForbidden(err error) bool { return hasStatus(err, http.StatusForbidden) }

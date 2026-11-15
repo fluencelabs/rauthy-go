@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 // The listing is the only read path, and the caller looks the entry up by the
-// spelling from its Terraform configuration while Rauthy stores its own
+// spelling from its own configuration while Rauthy stores its own
 // canonical rendering. The lookup therefore compares parsed addresses.
 func TestGetBlacklistedIP_MatchesNonCanonicalSpelling(t *testing.T) {
 	t.Parallel()

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Shared helpers for the scripts that boot a Rauthy container:
-# openapi-refresh.sh (scrapes the OpenAPI document) and rauthy-up.sh (stands up
-# an instance for the acceptance tests).
+# Helpers for openapi-refresh.sh, which boots a Rauthy container to scrape its
+# OpenAPI document.
 
 # rauthy_require_docker fails with an actionable message when there is no
 # reachable container runtime.
@@ -83,17 +82,4 @@ rauthy_pull_image() {
 		"docker://${image}" "docker-archive:${tar}:${image}"
 	docker load -i "$tar" >/dev/null
 	rm -f "$tar"
-}
-
-# rauthy_wait_ready <url> <attempts> polls until the URL answers.
-rauthy_wait_ready() {
-	local url="$1" attempts="${2:-60}"
-	local i
-	for ((i = 0; i < attempts; i++)); do
-		if curl -sf -o /dev/null "$url"; then
-			return 0
-		fi
-		sleep 2
-	done
-	return 1
 }

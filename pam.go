@@ -13,7 +13,7 @@ import (
 // Only the configuration surface is modelled here. Everything else under /pam —
 // login, mfa, password, preflight, getent, whoami and users/self — is the
 // runtime authentication flow a PAM/NSS client drives with a host secret, not
-// something Terraform declares.
+// configuration an administrator declares.
 //
 // THREE DIVERGENCES between the live 0.36.2 API and the OpenAPI document it
 // publishes were found while writing this, all verified with curl against a
@@ -169,8 +169,8 @@ func pamUserPath(uid int64) string  { return pamUsersPath + "/" + strconv.Format
 
 // Host ids are Rauthy-generated and match ^[a-zA-Z0-9]{24}$, so there is
 // nothing here that url.PathEscape would change; it is applied anyway because
-// the id can also arrive from `terraform import`, where it is whatever the
-// operator typed.
+// the id can also come straight from a caller (an import, say), where it is
+// whatever the operator typed.
 func pamHostPath(id string) string { return pamHostsPath + "/" + url.PathEscape(id) }
 
 // CreatePamGroup issues POST /pam/groups. Requires the Pam:Create right.
@@ -264,7 +264,7 @@ func (c *Client) UpdatePamUser(ctx context.Context, uid int64, req PamUserUpdate
 //
 // DIVERGENCE TWO. The OpenAPI document lists only GET and PUT for this path, so
 // on paper a PAM user can be created and never removed — which would make it
-// unmanageable by Terraform. A live 0.36.2 answers DELETE with 200 and the user
+// unmanageable by any declarative tool. A live 0.36.2 answers DELETE with 200 and the user
 // is gone afterwards, together with the personal group Rauthy created for it.
 // The document simply omits the operation.
 func (c *Client) DeletePamUser(ctx context.Context, uid int64) error {
@@ -322,9 +322,9 @@ func (c *Client) DeletePamHost(ctx context.Context, id string) error {
 // GetPamHostSecret issues POST /pam/hosts/{id}/secret, which reads the current
 // secret rather than creating one — the verb is POST because the operation is
 // privileged, not because it writes. Rotation is PUT on the same path, which
-// this provider deliberately does not expose: a rotation would break every
-// client already configured with the old secret, and Terraform has no way to
-// know when that is wanted.
+// this client deliberately does not expose: a rotation would break every
+// client already configured with the old secret, and a declarative caller has
+// no way to know when that is wanted.
 func (c *Client) GetPamHostSecret(ctx context.Context, id string) (*PamHostSecretResponse, error) {
 	var out PamHostSecretResponse
 	if err := c.do(ctx, http.MethodPost, pamHostPath(id)+"/secret", nil, &out); err != nil {

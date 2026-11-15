@@ -17,7 +17,7 @@ import (
 // ErrNoSpec is returned when no vendored spec is present in testdata. The spec
 // is produced by `make openapi-refresh`, which needs Docker and is run by hand;
 // see scripts/openapi-refresh.sh.
-var ErrNoSpec = errors.New("no vendored Rauthy OpenAPI spec in rauthy/mock/testdata")
+var ErrNoSpec = errors.New("no vendored Rauthy OpenAPI spec in mock/testdata")
 
 // SpecPath returns the path of the vendored spec. The filename carries the
 // Rauthy version it was generated from (rauthy-openapi-<version>.json) so that
@@ -47,7 +47,7 @@ func SpecPath() (string, error) {
 }
 
 // NewValidator builds a request/response validator from the vendored spec. This
-// is the authoritative contract: drift between what the provider sends and what
+// is the authoritative contract: drift between what the client sends and what
 // Rauthy accepts shows up here without a live instance.
 func NewValidator() (validator.Validator, []error, error) {
 	path, err := SpecPath()

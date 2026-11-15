@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 func TestContract_CreateUserRequest(t *testing.T) {
@@ -29,7 +29,7 @@ func TestContract_CreateUserRequest(t *testing.T) {
 }
 
 // Roles is required even when empty: a nil slice would marshal to null and
-// Rauthy's deserializer rejects that, which is why the provider sends [].
+// Rauthy's deserializer rejects that, which is why the client sends [].
 func TestContract_CreateUserRequiresRoles(t *testing.T) {
 	v := newContractValidator(t)
 
@@ -63,7 +63,7 @@ func TestContract_UpdateUserRequest(t *testing.T) {
 }
 
 // A PUT is a full replacement and Rauthy's deserializer requires these four.
-// If a future spec relaxes that, the provider may stop sending them.
+// If a future spec relaxes that, the client may stop sending them.
 func TestContract_UpdateUserRequiresEnabledAndVerified(t *testing.T) {
 	v := newContractValidator(t)
 

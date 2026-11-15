@@ -8,7 +8,7 @@ import (
 
 // Wire types mirroring Rauthy's `rauthy_api_types::api_keys` at v0.36.2.
 //
-// These are the keys this provider itself authenticates with, so managing them
+// These are the keys this client itself authenticates with, so managing them
 // only became possible in Rauthy 0.36: every /api_keys endpoint used to demand
 // an admin browser session and answered `401 No valid session` to an API key,
 // and no AccessGroup could grant otherwise. 0.36 added the `ApiKeys` group, and

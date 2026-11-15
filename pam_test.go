@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/rauthy-go"
 )
 
 // The PAM endpoints are the ones where the OpenAPI document and the live server
@@ -168,7 +168,7 @@ func TestPamHost_AddressListsDecodeAsArrays(t *testing.T) {
 }
 
 // Reading a host's secret is a POST, which is easy to mistake for the rotation
-// on the same path — that one is a PUT, and the provider must never issue it.
+// on the same path — that one is a PUT, and the client must never issue it.
 func TestGetPamHostSecret_PostsAndNeverRotates(t *testing.T) {
 	t.Parallel()
 
