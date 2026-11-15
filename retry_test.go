@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -11,19 +11,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 // retryTestPolicy shrinks the budget to something a test can afford. The point
 // of the retry code is which requests are re-sent, not how long the pauses are,
 // and the pauses are the only expensive part.
-func retryTestPolicy() client.Option {
-	return client.WithRetryPolicy(4, time.Microsecond, time.Millisecond)
+func retryTestPolicy() rauthy.Option {
+	return rauthy.WithRetryPolicy(4, time.Microsecond, time.Millisecond)
 }
 
 // newRetryClient wires a client with the fast policy to a counting server, and
 // returns the request counter.
-func newRetryClient(t *testing.T, handler http.HandlerFunc) (*client.Client, *atomic.Int32) {
+func newRetryClient(t *testing.T, handler http.HandlerFunc) (*rauthy.Client, *atomic.Int32) {
 	t.Helper()
 
 	var calls atomic.Int32
@@ -33,7 +33,7 @@ func newRetryClient(t *testing.T, handler http.HandlerFunc) (*client.Client, *at
 	}))
 	t.Cleanup(srv.Close)
 
-	c, err := client.New(srv.URL, "tf$secret", retryTestPolicy())
+	c, err := rauthy.New(srv.URL, "tf$secret", retryTestPolicy())
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestRetry_ExhaustsBudgetAndReportsLastError(t *testing.T) {
 
 	_, err := c.GetUser(t.Context(), "u1")
 
-	var apiErr *client.APIError
+	var apiErr *rauthy.APIError
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("err = %v, want *APIError", err)
 	}
@@ -204,7 +204,7 @@ func TestRetry_ReplaysRequestBody(t *testing.T) {
 
 	// POST /blacklist rather than POST /users: it is the upsert, and so the one
 	// POST this client will re-send after a 503.
-	err := c.BlacklistIP(t.Context(), client.IPBlacklistRequest{IP: "192.0.2.7", Exp: 4102444800})
+	err := c.BlacklistIP(t.Context(), rauthy.IPBlacklistRequest{IP: "192.0.2.7", Exp: 4102444800})
 	if err != nil {
 		t.Fatalf("BlacklistIP: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestRetry_ReplaysRequestBody(t *testing.T) {
 
 	close(bodies)
 	for body := range bodies {
-		var got client.IPBlacklistRequest
+		var got rauthy.IPBlacklistRequest
 		if unmarshalErr := json.Unmarshal([]byte(body), &got); unmarshalErr != nil {
 			t.Fatalf("attempt body %q is not the request: %v", body, unmarshalErr)
 		}
@@ -233,7 +233,7 @@ func TestRetry_CreatingPOSTIsNotRetried(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 	})
 
-	_, err := c.CreateUser(t.Context(), client.NewUserRequest{Email: "a@example.com"})
+	_, err := c.CreateUser(t.Context(), rauthy.NewUserRequest{Email: "a@example.com"})
 	if err == nil {
 		t.Fatal("CreateUser: want error")
 	}
@@ -256,7 +256,7 @@ func TestRetry_CreatingPOSTIsRetriedOnTooManyRequests(t *testing.T) {
 		_, _ = io.WriteString(w, `{"id":"u1","email":"a@example.com"}`)
 	})
 
-	user, err := c.CreateUser(t.Context(), client.NewUserRequest{Email: "a@example.com"})
+	user, err := c.CreateUser(t.Context(), rauthy.NewUserRequest{Email: "a@example.com"})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestRetry_CoversDownload(t *testing.T) {
 		_, _ = w.Write([]byte{0x00, 0x01})
 	})
 
-	img, err := c.GetClientImage(t.Context(), "cl1", client.ImageLogo)
+	img, err := c.GetClientImage(t.Context(), "cl1", rauthy.ImageLogo)
 	if err != nil {
 		t.Fatalf("GetClientImage: %v", err)
 	}
@@ -311,8 +311,8 @@ func TestRetry_CoversUpload(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	img := client.Image{Data: []byte("<svg/>"), ContentType: client.MimeSVG}
-	if err := c.PutClientImage(t.Context(), "cl1", client.ImageLogo, img); err != nil {
+	img := rauthy.Image{Data: []byte("<svg/>"), ContentType: rauthy.MimeSVG}
+	if err := c.PutClientImage(t.Context(), "cl1", rauthy.ImageLogo, img); err != nil {
 		t.Fatalf("PutClientImage: %v", err)
 	}
 	if got := calls.Load(); got != 2 {
@@ -342,14 +342,14 @@ func TestRetry_ConnectionErrors(t *testing.T) {
 	url := srv.URL
 	srv.Close()
 
-	c, err := client.New(url, "tf$secret", retryTestPolicy())
+	c, err := rauthy.New(url, "tf$secret", retryTestPolicy())
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	if _, err = c.GetUser(t.Context(), "u1"); err == nil {
 		t.Fatal("GetUser: want a connection error")
 	}
-	var apiErr *client.APIError
+	var apiErr *rauthy.APIError
 	if errors.As(err, &apiErr) {
 		t.Errorf("err = %v, want a transport error rather than an APIError", err)
 	}
@@ -368,7 +368,7 @@ func TestRetry_StopsOnCancelledContext(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c, err := client.New(srv.URL, "tf$secret", client.WithRetryPolicy(10, 30*time.Second, time.Minute))
+	c, err := rauthy.New(srv.URL, "tf$secret", rauthy.WithRetryPolicy(10, 30*time.Second, time.Minute))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

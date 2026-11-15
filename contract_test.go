@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"bytes"
@@ -11,8 +11,8 @@ import (
 
 	validator "github.com/pb33f/libopenapi-validator"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client/mock"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy/mock"
 )
 
 // The contract tests validate the bodies this package sends, and the bodies it
@@ -39,7 +39,7 @@ func newContractValidator(t *testing.T) validator.Validator {
 }
 
 // apiPath prefixes a spec path with the API base path the provider talks to.
-func apiPath(p string) string { return client.APIBasePath + p }
+func apiPath(p string) string { return rauthy.APIBasePath + p }
 
 func validateRequest(t *testing.T, v validator.Validator, method, path string, body any) (bool, string) {
 	t.Helper()
@@ -101,7 +101,7 @@ func TestContract_CreateClientRequest(t *testing.T) {
 	v := newContractValidator(t)
 
 	name := "Example App"
-	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/clients"), client.NewClientRequest{
+	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/clients"), rauthy.NewClientRequest{
 		ID:                     "example-app",
 		Name:                   &name,
 		Confidential:           true,
@@ -118,7 +118,7 @@ func TestContract_UpdateClientRequest(t *testing.T) {
 
 	name := "Example App"
 	uri := "https://app.example.com"
-	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/clients/example-app"), client.UpdateClientRequest{
+	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/clients/example-app"), rauthy.UpdateClientRequest{
 		ID:                     "example-app",
 		Name:                   &name,
 		Confidential:           true,
@@ -187,7 +187,7 @@ func TestContract_ClientResponse(t *testing.T) {
 	}
 
 	// The same body must round-trip into our type without losing fields.
-	var decoded client.ClientResponse
+	var decoded rauthy.ClientResponse
 	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
 		t.Fatalf("decode into ClientResponse: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestContract_RotateSecretRequest(t *testing.T) {
 
 	hours := int64(6)
 	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/clients/example-app/secret"),
-		client.ClientSecretRequest{CacheCurrentHours: &hours})
+		rauthy.ClientSecretRequest{CacheCurrentHours: &hours})
 	if !ok {
 		t.Errorf("PUT /clients/{id}/secret body rejected by the spec: %s", msg)
 	}
@@ -230,7 +230,7 @@ func TestContract_SpecDoesNotCarryValueRanges(t *testing.T) {
 
 	tooMany := int64(48)
 	ok, _ := validateRequest(t, v, http.MethodPut, apiPath("/clients/example-app/secret"),
-		client.ClientSecretRequest{CacheCurrentHours: &tooMany})
+		rauthy.ClientSecretRequest{CacheCurrentHours: &tooMany})
 	if !ok {
 		t.Log("the spec now rejects cache_current_hours=48; ranges became machine-readable, " +
 			"the contract tests can start asserting them")
@@ -240,12 +240,12 @@ func TestContract_SpecDoesNotCarryValueRanges(t *testing.T) {
 func TestContract_RoleRequest(t *testing.T) {
 	v := newContractValidator(t)
 
-	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/roles"), client.RoleRequest{Role: "admin"})
+	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/roles"), rauthy.RoleRequest{Role: "admin"})
 	if !ok {
 		t.Errorf("POST /roles body rejected by the spec: %s", msg)
 	}
 
-	ok, msg = validateRequest(t, v, http.MethodPut, apiPath("/roles/role-1"), client.RoleRequest{Role: "operator"})
+	ok, msg = validateRequest(t, v, http.MethodPut, apiPath("/roles/role-1"), rauthy.RoleRequest{Role: "operator"})
 	if !ok {
 		t.Errorf("PUT /roles/{id} body rejected by the spec: %s", msg)
 	}
@@ -264,12 +264,12 @@ func TestContract_RoleResponse(t *testing.T) {
 func TestContract_GroupRequest(t *testing.T) {
 	v := newContractValidator(t)
 
-	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/groups"), client.GroupRequest{Group: "developers"})
+	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/groups"), rauthy.GroupRequest{Group: "developers"})
 	if !ok {
 		t.Errorf("POST /groups body rejected by the spec: %s", msg)
 	}
 
-	ok, msg = validateRequest(t, v, http.MethodPut, apiPath("/groups/group-1"), client.GroupRequest{Group: "ops"})
+	ok, msg = validateRequest(t, v, http.MethodPut, apiPath("/groups/group-1"), rauthy.GroupRequest{Group: "ops"})
 	if !ok {
 		t.Errorf("PUT /groups/{id} body rejected by the spec: %s", msg)
 	}
@@ -289,7 +289,7 @@ func TestContract_PasswordPolicyRequest(t *testing.T) {
 	v := newContractValidator(t)
 
 	digits := int32(1)
-	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/password_policy"), client.PasswordPolicy{
+	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/password_policy"), rauthy.PasswordPolicy{
 		LengthMin:     12,
 		LengthMax:     128,
 		IncludeDigits: &digits,
@@ -313,7 +313,7 @@ func TestContract_PasswordPolicyResponse(t *testing.T) {
 func TestContract_ScopeRequest(t *testing.T) {
 	v := newContractValidator(t)
 
-	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/scopes"), client.ScopeRequest{
+	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/scopes"), rauthy.ScopeRequest{
 		Scope:             "read:billing",
 		AttrIncludeAccess: []string{"department", "cost_center"},
 		AttrIncludeID:     []string{"department"},
@@ -322,7 +322,7 @@ func TestContract_ScopeRequest(t *testing.T) {
 		t.Errorf("POST /scopes body rejected by the spec: %s", msg)
 	}
 
-	ok, msg = validateRequest(t, v, http.MethodPut, apiPath("/scopes/scope-1"), client.ScopeRequest{
+	ok, msg = validateRequest(t, v, http.MethodPut, apiPath("/scopes/scope-1"), rauthy.ScopeRequest{
 		Scope: "read:billing",
 	})
 	if !ok {
@@ -365,7 +365,7 @@ func TestContract_AuthProviderRequest(t *testing.T) {
 
 	secret := "upstream-secret"
 	jwks := "https://idp.example.com/jwks"
-	body := client.AuthProviderRequest{
+	body := rauthy.AuthProviderRequest{
 		Name:                  "Example IdP",
 		Typ:                   "oidc",
 		Enabled:               true,
@@ -445,7 +445,7 @@ func TestContract_AuthProviderScopeIsNotRoundTrippable(t *testing.T) {
 
 	for _, scope := range []string{"openid profile email", "openid+profile+email"} {
 		ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/providers/provider-1"),
-			client.AuthProviderRequest{
+			rauthy.AuthProviderRequest{
 				Name: "Example IdP", Typ: "oidc", Enabled: true,
 				Issuer:                "https://idp.example.com",
 				AuthorizationEndpoint: "https://idp.example.com/authorize",
@@ -466,7 +466,7 @@ func TestContract_AuthProviderLookup(t *testing.T) {
 
 	issuer := "accounts.google.com"
 	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/providers/lookup"),
-		client.AuthProviderLookupRequest{Issuer: &issuer})
+		rauthy.AuthProviderLookupRequest{Issuer: &issuer})
 	if !ok {
 		t.Errorf("POST /providers/lookup body rejected by the spec: %s", msg)
 	}
@@ -493,7 +493,7 @@ func TestContract_AuthProviderLookup(t *testing.T) {
 func TestContract_CreatePamUserRequest(t *testing.T) {
 	v := newContractValidator(t)
 
-	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/pam/users"), client.PamUserCreateRequest{
+	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/pam/users"), rauthy.PamUserCreateRequest{
 		Username: "alice",
 		Email:    "alice@example.com",
 	})
@@ -506,10 +506,10 @@ func TestContract_UpdatePamUserRequest(t *testing.T) {
 	v := newContractValidator(t)
 
 	homeDir := "/home/alice"
-	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/pam/users/100000"), client.PamUserUpdateRequest{
+	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/pam/users/100000"), rauthy.PamUserUpdateRequest{
 		Shell:   "/bin/zsh",
 		HomeDir: &homeDir,
-		Groups: []client.PamGroupUserLink{
+		Groups: []rauthy.PamGroupUserLink{
 			{UID: 100000, GID: 100002, Wheel: true},
 		},
 	})
@@ -529,7 +529,7 @@ func TestContract_PamUserDetailsResponse(t *testing.T) {
 		t.Errorf("GET /pam/users/{uid} response rejected by the spec: %s", msg)
 	}
 
-	var got client.PamUserDetailsResponse
+	var got rauthy.PamUserDetailsResponse
 	if err := json.Unmarshal([]byte(body), &got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -564,7 +564,7 @@ func TestContract_CreatePamGroupResponse_SpecDivergence(t *testing.T) {
 		`{"id":100002,"name":"developers","typ":"generic"}`)
 	if ok {
 		t.Error("the spec now accepts a single group from POST /pam/groups; " +
-			"the create/list mix-up documented in client/pam.go may be fixed — re-check it")
+			"the create/list mix-up documented in rauthy/pam.go may be fixed — re-check it")
 	}
 }
 
@@ -573,13 +573,13 @@ func TestContract_CreatePamGroupResponse_SpecDivergence(t *testing.T) {
 func TestContract_CreatePamHostRequest_SpecDivergence(t *testing.T) {
 	v := newContractValidator(t)
 
-	ok, _ := validateRequest(t, v, http.MethodPost, apiPath("/pam/hosts"), client.PamHostCreateRequest{
+	ok, _ := validateRequest(t, v, http.MethodPost, apiPath("/pam/hosts"), rauthy.PamHostCreateRequest{
 		Hostname: "build01",
 		GID:      100001,
 	})
 	if ok {
 		t.Error("the spec now describes POST /pam/hosts; " +
-			"the create operation documented as missing in client/pam.go may be back — re-check it")
+			"the create operation documented as missing in rauthy/pam.go may be back — re-check it")
 	}
 }
 
@@ -590,7 +590,7 @@ func TestContract_PamHostAddresses_SpecDivergence(t *testing.T) {
 	v := newContractValidator(t)
 
 	notes := "CI builder"
-	ok, _ := validateRequest(t, v, http.MethodPut, apiPath("/pam/hosts/h1"), client.PamHostUpdateRequest{
+	ok, _ := validateRequest(t, v, http.MethodPut, apiPath("/pam/hosts/h1"), rauthy.PamHostUpdateRequest{
 		Hostname:          "build01",
 		GID:               100001,
 		ForceMfa:          true,
@@ -601,7 +601,7 @@ func TestContract_PamHostAddresses_SpecDivergence(t *testing.T) {
 	})
 	if ok {
 		t.Error("the spec now accepts an array for PamHostUpdateRequest.ips; " +
-			"the string/array divergence documented in client/pam.go may be fixed — re-check it")
+			"the string/array divergence documented in rauthy/pam.go may be fixed — re-check it")
 	}
 
 	body := `{"id":"h1","hostname":"build01","gid":100001,"force_mfa":true,` +
@@ -613,7 +613,7 @@ func TestContract_PamHostAddresses_SpecDivergence(t *testing.T) {
 
 	// Whatever the document says, the shape the server actually sends must
 	// decode cleanly into the wire type.
-	var got client.PamHostDetailsResponse
+	var got rauthy.PamHostDetailsResponse
 	if err := json.Unmarshal([]byte(body), &got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -636,10 +636,10 @@ func TestContract_APIKeyRequest(t *testing.T) {
 	v := newContractValidator(t)
 
 	exp := int64(1900000000)
-	body := client.APIKeyRequest{
+	body := rauthy.APIKeyRequest{
 		Name: "deploy",
 		Exp:  &exp,
-		Access: []client.APIKeyAccess{
+		Access: []rauthy.APIKeyAccess{
 			{Group: "Users", AccessRights: []string{"read", "create"}},
 			// An empty rights list is legal and has to stay legal: it is what
 			// the provider sends for a group the practitioner listed but gave
@@ -718,7 +718,7 @@ func TestContract_APIKeyTestEndpointIsNotARead(t *testing.T) {
 func TestContract_BlacklistIPRequest(t *testing.T) {
 	v := newContractValidator(t)
 
-	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/blacklist"), client.IPBlacklistRequest{
+	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/blacklist"), rauthy.IPBlacklistRequest{
 		IP:  "203.0.113.7",
 		Exp: 4102444800,
 	})

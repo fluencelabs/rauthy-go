@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 const oneProviderJSON = `[{"id":"provider-1","name":"Example IdP","typ":"oidc","enabled":true,` +
@@ -39,7 +39,7 @@ func TestCreateAuthProvider_PostsToProvidersCreate(t *testing.T) {
 	})
 
 	secret := "upstream-secret"
-	got, err := c.CreateAuthProvider(context.Background(), client.AuthProviderRequest{
+	got, err := c.CreateAuthProvider(context.Background(), rauthy.AuthProviderRequest{
 		Name: "Example IdP", Typ: "oidc", Enabled: true,
 		Issuer:                "https://idp.example.com",
 		AuthorizationEndpoint: "https://idp.example.com/authorize",
@@ -107,7 +107,7 @@ func TestGetAuthProvider_MissingIsNotFound(t *testing.T) {
 		t.Fatalf("GetAuthProvider: %v", err)
 	}
 	_, err := c.GetAuthProvider(context.Background(), "provider-nope")
-	if !client.IsNotFound(err) {
+	if !rauthy.IsNotFound(err) {
 		t.Errorf("err = %v, want a synthetic 404", err)
 	}
 }
@@ -143,7 +143,7 @@ func TestUpdateAuthProvider_ToleratesEmptyBody(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := c.UpdateAuthProvider(context.Background(), "provider-1", client.AuthProviderRequest{
+	if err := c.UpdateAuthProvider(context.Background(), "provider-1", rauthy.AuthProviderRequest{
 		Name: "Example IdP", Typ: "oidc",
 	}); err != nil {
 		t.Fatalf("UpdateAuthProvider: %v", err)

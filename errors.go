@@ -1,4 +1,4 @@
-package client
+package rauthy
 
 import (
 	"encoding/json"

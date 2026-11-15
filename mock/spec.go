@@ -17,7 +17,7 @@ import (
 // ErrNoSpec is returned when no vendored spec is present in testdata. The spec
 // is produced by `make openapi-refresh`, which needs Docker and is run by hand;
 // see scripts/openapi-refresh.sh.
-var ErrNoSpec = errors.New("no vendored Rauthy OpenAPI spec in internal/client/mock/testdata")
+var ErrNoSpec = errors.New("no vendored Rauthy OpenAPI spec in rauthy/mock/testdata")
 
 // SpecPath returns the path of the vendored spec. The filename carries the
 // Rauthy version it was generated from (rauthy-openapi-<version>.json) so that

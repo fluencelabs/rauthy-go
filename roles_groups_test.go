@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 func TestCreateRole_SendsRoleField(t *testing.T) {
@@ -25,7 +25,7 @@ func TestCreateRole_SendsRoleField(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"role-1","name":"admin"}`))
 	})
 
-	got, err := c.CreateRole(context.Background(), client.RoleRequest{Role: "admin"})
+	got, err := c.CreateRole(context.Background(), rauthy.RoleRequest{Role: "admin"})
 	if err != nil {
 		t.Fatalf("CreateRole: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestGetRole_MissingRoleIsNotFound(t *testing.T) {
 		t.Errorf("got %+v, want admin", got)
 	}
 
-	if _, missingErr := c.GetRole(context.Background(), "role-2"); !client.IsNotFound(missingErr) {
+	if _, missingErr := c.GetRole(context.Background(), "role-2"); !rauthy.IsNotFound(missingErr) {
 		t.Errorf("GetRole(missing) error = %v, want a 404", missingErr)
 	}
 }
@@ -83,7 +83,7 @@ func TestGetRoleByName_MissingRoleIsNotFound(t *testing.T) {
 		t.Errorf("got %+v, want role-1", got)
 	}
 
-	if _, missingErr := c.GetRoleByName(context.Background(), "nope"); !client.IsNotFound(missingErr) {
+	if _, missingErr := c.GetRoleByName(context.Background(), "nope"); !rauthy.IsNotFound(missingErr) {
 		t.Errorf("GetRoleByName(missing) error = %v, want a 404", missingErr)
 	}
 }
@@ -98,7 +98,7 @@ func TestUpdateRole_PutsToRolePath(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"role-1","name":"operator"}`))
 	})
 
-	got, err := c.UpdateRole(context.Background(), "role-1", client.RoleRequest{Role: "operator"})
+	got, err := c.UpdateRole(context.Background(), "role-1", rauthy.RoleRequest{Role: "operator"})
 	if err != nil {
 		t.Fatalf("UpdateRole: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestCreateGroup_SendsGroupField(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"group-1","name":"developers"}`))
 	})
 
-	got, err := c.CreateGroup(context.Background(), client.GroupRequest{Group: "developers"})
+	got, err := c.CreateGroup(context.Background(), rauthy.GroupRequest{Group: "developers"})
 	if err != nil {
 		t.Fatalf("CreateGroup: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestUpdatePasswordPolicy_SendsExplicitNulls(t *testing.T) {
 	})
 
 	digits := int32(1)
-	got, err := c.UpdatePasswordPolicy(context.Background(), client.PasswordPolicy{
+	got, err := c.UpdatePasswordPolicy(context.Background(), rauthy.PasswordPolicy{
 		LengthMin:     12,
 		LengthMax:     128,
 		IncludeDigits: &digits,

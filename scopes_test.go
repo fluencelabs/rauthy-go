@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 // The request carries the attribute mappings as arrays; the response returns
@@ -29,7 +29,7 @@ func TestCreateScope_SendsArraysAndSplitsTheJoinedResponse(t *testing.T) {
 			`"attr_include_access":"department,cost_center","attr_include_id":"department"}`))
 	})
 
-	got, err := c.CreateScope(context.Background(), client.ScopeRequest{
+	got, err := c.CreateScope(context.Background(), rauthy.ScopeRequest{
 		Scope:             "read:billing",
 		AttrIncludeAccess: []string{"department", "cost_center"},
 		AttrIncludeID:     []string{"department"},
@@ -46,10 +46,10 @@ func TestCreateScope_SendsArraysAndSplitsTheJoinedResponse(t *testing.T) {
 		t.Errorf("attr_include_access = %#v, want a two-element array", gotBody["attr_include_access"])
 	}
 
-	if want := (client.AttrList{"department", "cost_center"}); !reflect.DeepEqual(got.AttrIncludeAccess, want) {
+	if want := (rauthy.AttrList{"department", "cost_center"}); !reflect.DeepEqual(got.AttrIncludeAccess, want) {
 		t.Errorf("AttrIncludeAccess = %v, want %v", got.AttrIncludeAccess, want)
 	}
-	if want := (client.AttrList{"department"}); !reflect.DeepEqual(got.AttrIncludeID, want) {
+	if want := (rauthy.AttrList{"department"}); !reflect.DeepEqual(got.AttrIncludeID, want) {
 		t.Errorf("AttrIncludeID = %v, want %v", got.AttrIncludeID, want)
 	}
 }
@@ -64,20 +64,20 @@ func TestAttrList_DecodesBothShapes(t *testing.T) {
 
 	cases := map[string]struct {
 		raw  string
-		want client.AttrList
+		want rauthy.AttrList
 	}{
 		"null":                    {`null`, nil},
-		"joined string":           {`"department,cost_center"`, client.AttrList{"department", "cost_center"}},
+		"joined string":           {`"department,cost_center"`, rauthy.AttrList{"department", "cost_center"}},
 		"empty string":            {`""`, nil},
 		"string of separators":    {`" , "`, nil},
-		"padded joined string":    {`" department , cost_center "`, client.AttrList{"department", "cost_center"}},
-		"array":                   {`["department","cost_center"]`, client.AttrList{"department", "cost_center"}},
+		"padded joined string":    {`" department , cost_center "`, rauthy.AttrList{"department", "cost_center"}},
+		"array":                   {`["department","cost_center"]`, rauthy.AttrList{"department", "cost_center"}},
 		"empty array":             {`[]`, nil},
 		"array holding one empty": {`[""]`, nil},
 	}
 
 	for name, tc := range cases {
-		var got client.AttrList
+		var got rauthy.AttrList
 		if err := json.Unmarshal([]byte(tc.raw), &got); err != nil {
 			t.Errorf("%s: unmarshal %s: %v", name, tc.raw, err)
 			continue
@@ -93,7 +93,7 @@ func TestAttrList_DecodesBothShapes(t *testing.T) {
 func TestAttrList_RejectsAnEmptyAttributeName(t *testing.T) {
 	t.Parallel()
 
-	var s client.ScopeResponse
+	var s rauthy.ScopeResponse
 	body := `{"id":"scope-1","name":"probe","attr_include_access":"","attr_include_id":[""]}`
 	if err := json.Unmarshal([]byte(body), &s); err != nil {
 		t.Fatalf("unmarshal: %v", err)
@@ -117,7 +117,7 @@ func TestScopeRequest_OmitsEmptyMappings(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"scope-1","name":"plain"}`))
 	})
 
-	got, err := c.CreateScope(context.Background(), client.ScopeRequest{Scope: "plain"})
+	got, err := c.CreateScope(context.Background(), rauthy.ScopeRequest{Scope: "plain"})
 	if err != nil {
 		t.Fatalf("CreateScope: %v", err)
 	}
@@ -145,10 +145,10 @@ func TestGetScope_MissingScopeIsNotFound(t *testing.T) {
 	if _, err := c.GetScope(context.Background(), "scope-1"); err != nil {
 		t.Fatalf("GetScope: %v", err)
 	}
-	if _, err := c.GetScope(context.Background(), "scope-2"); !client.IsNotFound(err) {
+	if _, err := c.GetScope(context.Background(), "scope-2"); !rauthy.IsNotFound(err) {
 		t.Errorf("GetScope(missing) error = %v, want a 404", err)
 	}
-	if _, err := c.GetScopeByName(context.Background(), "nope"); !client.IsNotFound(err) {
+	if _, err := c.GetScopeByName(context.Background(), "nope"); !rauthy.IsNotFound(err) {
 		t.Errorf("GetScopeByName(missing) error = %v, want a 404", err)
 	}
 }
@@ -163,7 +163,7 @@ func TestUpdateScope_PutsToScopePath(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"a/b","name":"renamed"}`))
 	})
 
-	if _, err := c.UpdateScope(context.Background(), "a/b", client.ScopeRequest{Scope: "renamed"}); err != nil {
+	if _, err := c.UpdateScope(context.Background(), "a/b", rauthy.ScopeRequest{Scope: "renamed"}); err != nil {
 		t.Fatalf("UpdateScope: %v", err)
 	}
 	if gotMethod != http.MethodPut || gotPath != "/auth/v1/scopes/a%2Fb" {

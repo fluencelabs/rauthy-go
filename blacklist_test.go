@@ -1,11 +1,11 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 // The listing is the only read path, and the caller looks the entry up by the
@@ -42,7 +42,7 @@ func TestGetBlacklistedIP_MissingEntryIsNotFound(t *testing.T) {
 	})
 
 	_, err := c.GetBlacklistedIP(context.Background(), "203.0.113.7")
-	if !client.IsNotFound(err) {
+	if !rauthy.IsNotFound(err) {
 		t.Fatalf("err = %v, want a synthetic 404", err)
 	}
 }
@@ -56,7 +56,7 @@ func TestGetBlacklistedIP_DoesNotMatchADifferentAddress(t *testing.T) {
 		_, _ = w.Write([]byte(`{"ips":[{"ip":"203.0.113.70","exp":4102444800}]}`))
 	})
 
-	if _, err := c.GetBlacklistedIP(context.Background(), "203.0.113.7"); !client.IsNotFound(err) {
+	if _, err := c.GetBlacklistedIP(context.Background(), "203.0.113.7"); !rauthy.IsNotFound(err) {
 		t.Fatalf("err = %v, want a synthetic 404", err)
 	}
 }

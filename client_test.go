@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -9,17 +9,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 // newTestClient wires a Client to a test server and records the last request it
 // received.
-func newTestClient(t *testing.T, handler http.HandlerFunc) *client.Client {
+func newTestClient(t *testing.T, handler http.HandlerFunc) *rauthy.Client {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
-	c, err := client.New(srv.URL, "tf$secret")
+	c, err := rauthy.New(srv.URL, "tf$secret")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestNew_AppendsAPIBasePath(t *testing.T) {
 		"https://auth.example.com/auth/v1/": "https://auth.example.com/auth/v1",
 	}
 	for in, want := range cases {
-		c, err := client.New(in, "tf$secret")
+		c, err := rauthy.New(in, "tf$secret")
 		if err != nil {
 			t.Fatalf("New(%q): %v", in, err)
 		}
@@ -57,7 +57,7 @@ func TestNew_RejectsBadConfig(t *testing.T) {
 		"blank api key": {"https://auth.example.com", "   "},
 	}
 	for name, tc := range cases {
-		if _, err := client.New(tc.url, tc.key); err == nil {
+		if _, err := rauthy.New(tc.url, tc.key); err == nil {
 			t.Errorf("%s: New(%q, %q) succeeded, want error", name, tc.url, tc.key)
 		}
 	}
@@ -84,7 +84,7 @@ func TestCreateClient_SendsAPIKeyHeaderAndMinimalBody(t *testing.T) {
 	})
 
 	name := "App"
-	_, err := c.CreateClient(context.Background(), client.NewClientRequest{
+	_, err := c.CreateClient(context.Background(), rauthy.NewClientRequest{
 		ID:           "app",
 		Name:         &name,
 		Confidential: true,
@@ -164,7 +164,7 @@ func TestGetClientSecret_403NamesTheMissingRight(t *testing.T) {
 	if !strings.Contains(err.Error(), "Secrets:Read") {
 		t.Errorf("error %q does not name the missing Secrets:Read right", err)
 	}
-	if !client.IsForbidden(err) {
+	if !rauthy.IsForbidden(err) {
 		t.Error("IsForbidden = false on a wrapped 403")
 	}
 }
@@ -222,7 +222,7 @@ func TestNotFoundIsDetectable(t *testing.T) {
 	})
 
 	_, err := c.GetClient(context.Background(), "gone")
-	if !client.IsNotFound(err) {
+	if !rauthy.IsNotFound(err) {
 		t.Fatalf("IsNotFound = false for err %v", err)
 	}
 	if !strings.Contains(err.Error(), "not found") {

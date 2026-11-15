@@ -1,11 +1,11 @@
-package client_test
+package rauthy_test
 
 import (
 	"encoding/json"
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 func TestContract_CreateUserRequest(t *testing.T) {
@@ -14,7 +14,7 @@ func TestContract_CreateUserRequest(t *testing.T) {
 	given := "Ada"
 	family := "Lovelace"
 	expires := int64(4102444800)
-	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/users"), client.NewUserRequest{
+	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/users"), rauthy.NewUserRequest{
 		Email:       "ada@example.com",
 		Language:    "en",
 		Roles:       []string{"admin"},
@@ -47,7 +47,7 @@ func TestContract_UpdateUserRequest(t *testing.T) {
 	lang := "en"
 	city := "London"
 	tz := "Europe/London"
-	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/users/u-1"), client.UpdateUserRequest{
+	ok, msg := validateRequest(t, v, http.MethodPut, apiPath("/users/u-1"), rauthy.UpdateUserRequest{
 		Email:         "ada@example.com",
 		Enabled:       true,
 		EmailVerified: true,
@@ -55,7 +55,7 @@ func TestContract_UpdateUserRequest(t *testing.T) {
 		Groups:        []string{},
 		GivenName:     &given,
 		Language:      &lang,
-		UserValues:    &client.UserValues{City: &city, TZ: &tz},
+		UserValues:    &rauthy.UserValues{City: &city, TZ: &tz},
 	})
 	if !ok {
 		t.Errorf("PUT /users/{id} body rejected by the spec: %s", msg)
@@ -96,7 +96,7 @@ func TestContract_UserResponse(t *testing.T) {
 		t.Errorf("GET /users/{id} response rejected by the spec: %s", msg)
 	}
 
-	var decoded client.UserResponse
+	var decoded rauthy.UserResponse
 	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
 		t.Fatalf("decode into UserResponse: %v", err)
 	}

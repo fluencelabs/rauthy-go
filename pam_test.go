@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 // The PAM endpoints are the ones where the OpenAPI document and the live server
@@ -36,7 +36,7 @@ func TestPamGroups_PostCreatesAndGetLists(t *testing.T) {
 		_, _ = w.Write([]byte(`[{"id":100002,"name":"developers","typ":"generic"}]`))
 	})
 
-	created, err := c.CreatePamGroup(context.Background(), client.PamGroupCreateRequest{
+	created, err := c.CreatePamGroup(context.Background(), rauthy.PamGroupCreateRequest{
 		Name: "developers", Typ: "generic",
 	})
 	if err != nil {
@@ -74,7 +74,7 @@ func TestGetPamGroup_MissingGidIsNotFound(t *testing.T) {
 		_, _ = w.Write([]byte(`[{"id":100002,"name":"developers","typ":"generic"}]`))
 	})
 
-	if _, err := c.GetPamGroup(context.Background(), 100003); !client.IsNotFound(err) {
+	if _, err := c.GetPamGroup(context.Background(), 100003); !rauthy.IsNotFound(err) {
 		t.Fatalf("err = %v, want a 404", err)
 	}
 }
@@ -114,7 +114,7 @@ func TestCreatePamHost_PostsToHosts(t *testing.T) {
 			`{"id":"cZNsjgeHChYfPCTrVYBQovsj","name":"build01","aliases":[],"addresses":[]}`))
 	})
 
-	got, err := c.CreatePamHost(context.Background(), client.PamHostCreateRequest{
+	got, err := c.CreatePamHost(context.Background(), rauthy.PamHostCreateRequest{
 		Hostname: "build01", GID: 100001, ForceMfa: true,
 	})
 	if err != nil {
@@ -202,9 +202,9 @@ func TestUpdatePamUser_SendsEmptyGroupsAsArray(t *testing.T) {
 		_ = json.Unmarshal(raw, &gotBody)
 	})
 
-	err := c.UpdatePamUser(context.Background(), 100000, client.PamUserUpdateRequest{
+	err := c.UpdatePamUser(context.Background(), 100000, rauthy.PamUserUpdateRequest{
 		Shell:  "/bin/bash",
-		Groups: []client.PamGroupUserLink{},
+		Groups: []rauthy.PamGroupUserLink{},
 	})
 	if err != nil {
 		t.Fatalf("UpdatePamUser: %v", err)

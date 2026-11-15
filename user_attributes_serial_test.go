@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 // Rauthy rewrites the whole user attribute list on every write without locking,
@@ -40,10 +40,10 @@ func TestUserAttrWritesAreSerialised(t *testing.T) {
 			switch i % 3 {
 			case 0:
 				_, err = c.CreateUserAttr(context.Background(),
-					client.UserAttrRequest{Name: "department"})
+					rauthy.UserAttrRequest{Name: "department"})
 			case 1:
 				err = c.UpdateUserAttr(context.Background(), "department",
-					client.UserAttrRequest{Name: "department"})
+					rauthy.UserAttrRequest{Name: "department"})
 			default:
 				err = c.DeleteUserAttr(context.Background(), "department")
 			}

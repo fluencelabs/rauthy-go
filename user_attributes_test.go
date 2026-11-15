@@ -1,11 +1,11 @@
-package client_test
+package rauthy_test
 
 import (
 	"encoding/json"
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 func TestContract_UserAttrRequest(t *testing.T) {
@@ -13,7 +13,7 @@ func TestContract_UserAttrRequest(t *testing.T) {
 
 	desc := "cost-center"
 	editable := false
-	body := client.UserAttrRequest{
+	body := rauthy.UserAttrRequest{
 		Name:         "department",
 		Desc:         &desc,
 		DefaultValue: json.RawMessage(`"engineering"`),
@@ -44,7 +44,7 @@ func TestContract_UserAttrRequestTakesAnyJSONDefault(t *testing.T) {
 		"array":  `["a","b"]`,
 		"object": `{"a":1}`,
 	} {
-		ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/users/attr"), client.UserAttrRequest{
+		ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/users/attr"), rauthy.UserAttrRequest{
 			Name:         "department",
 			DefaultValue: json.RawMessage(raw),
 		})
@@ -60,7 +60,7 @@ func TestContract_UserAttrRequestNeedsOnlyAName(t *testing.T) {
 	v := newContractValidator(t)
 
 	ok, msg := validateRequest(t, v, http.MethodPost, apiPath("/users/attr"),
-		client.UserAttrRequest{Name: "department"})
+		rauthy.UserAttrRequest{Name: "department"})
 	if !ok {
 		t.Errorf("POST /users/attr with only a name rejected by the spec: %s", msg)
 	}
@@ -105,7 +105,7 @@ func TestContract_UserAttrResponse(t *testing.T) {
 		t.Errorf("POST /users/attr response rejected by the spec: %s", msg)
 	}
 
-	var decoded client.UserAttrResponse
+	var decoded rauthy.UserAttrResponse
 	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
 		t.Fatalf("decode into UserAttrResponse: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestContract_UserAttrResponseWithoutOptionalFields(t *testing.T) {
 	}
 
 	var decoded struct {
-		Values []client.UserAttrResponse `json:"values"`
+		Values []rauthy.UserAttrResponse `json:"values"`
 	}
 	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
 		t.Fatalf("decode: %v", err)

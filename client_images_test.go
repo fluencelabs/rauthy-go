@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 func TestSniffImageMime(t *testing.T) {
@@ -22,20 +22,20 @@ func TestSniffImageMime(t *testing.T) {
 		want string
 		bad  bool
 	}{
-		{name: "png", data: []byte("\x89PNG\r\n\x1a\n\x00\x00"), want: client.MimePNG},
-		{name: "jpeg", data: []byte{0xFF, 0xD8, 0xFF, 0xE0}, want: client.MimeJPEG},
-		{name: "bare svg", data: []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`), want: client.MimeSVG},
+		{name: "png", data: []byte("\x89PNG\r\n\x1a\n\x00\x00"), want: rauthy.MimePNG},
+		{name: "jpeg", data: []byte{0xFF, 0xD8, 0xFF, 0xE0}, want: rauthy.MimeJPEG},
+		{name: "bare svg", data: []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`), want: rauthy.MimeSVG},
 		{
 			name: "svg behind an xml declaration",
 			data: []byte("<?xml version=\"1.0\"?>\n<svg/>"),
-			want: client.MimeSVG,
+			want: rauthy.MimeSVG,
 		},
 		{
 			// A byte-order mark ahead of the declaration is common from
 			// Windows editors and must not defeat the sniff.
 			name: "svg behind a bom",
 			data: []byte("\xef\xbb\xbf<svg/>"),
-			want: client.MimeSVG,
+			want: rauthy.MimeSVG,
 		},
 		{name: "webp is not an accepted upload type", data: []byte("RIFF\x00\x00\x00\x00WEBPVP8L"), bad: true},
 		{name: "gif is not an accepted upload type", data: []byte("GIF89a"), bad: true},
@@ -46,7 +46,7 @@ func TestSniffImageMime(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := client.SniffImageMime(tc.data)
+			got, err := rauthy.SniffImageMime(tc.data)
 			if tc.bad {
 				if err == nil {
 					t.Fatalf("SniffImageMime = %q, want an error", got)
@@ -101,15 +101,15 @@ func TestPutClientImageWireFormat(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := client.New(srv.URL, "name$secret")
+	c, err := rauthy.New(srv.URL, "name$secret")
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}
 
 	payload := []byte("\x89PNG\r\n\x1a\npretend this is an image")
-	err = c.PutClientImage(context.Background(), "my client", client.ImageLogo, client.Image{
+	err = c.PutClientImage(context.Background(), "my client", rauthy.ImageLogo, rauthy.Image{
 		Data:        payload,
-		ContentType: client.MimePNG,
+		ContentType: rauthy.MimePNG,
 	})
 	if err != nil {
 		t.Fatalf("PutClientImage: %v", err)
@@ -126,8 +126,8 @@ func TestPutClientImageWireFormat(t *testing.T) {
 	if gotPartFile == "" {
 		t.Error("part has no filename; Rauthy needs one to treat it as a file upload")
 	}
-	if gotPartType != client.MimePNG {
-		t.Errorf("part content type = %q, want %q", gotPartType, client.MimePNG)
+	if gotPartType != rauthy.MimePNG {
+		t.Errorf("part content type = %q, want %q", gotPartType, rauthy.MimePNG)
 	}
 	if string(gotPartPayload) != string(payload) {
 		t.Errorf("part payload = %q, want %q", gotPartPayload, payload)
@@ -149,12 +149,12 @@ func TestGetClientImageReturnsRawBytes(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := client.New(srv.URL, "name$secret")
+	c, err := rauthy.New(srv.URL, "name$secret")
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}
 
-	got, err := c.GetClientImage(context.Background(), "app", client.ImageFavicon)
+	got, err := c.GetClientImage(context.Background(), "app", rauthy.ImageFavicon)
 	if err != nil {
 		t.Fatalf("GetClientImage: %v", err)
 	}
@@ -167,8 +167,8 @@ func TestGetClientImageReturnsRawBytes(t *testing.T) {
 
 	// An absent image is a bare 404 with no error envelope, so IsNotFound has
 	// to work off the status alone.
-	_, missingErr := c.GetClientImage(context.Background(), "app", client.ImageLogo)
-	if !client.IsNotFound(missingErr) {
+	_, missingErr := c.GetClientImage(context.Background(), "app", rauthy.ImageLogo)
+	if !rauthy.IsNotFound(missingErr) {
 		t.Fatalf("missing logo: got %v, want a not-found error", missingErr)
 	}
 }

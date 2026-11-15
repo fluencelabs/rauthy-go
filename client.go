@@ -1,5 +1,4 @@
-// Package client is a thin HTTP client for the Rauthy admin API (/auth/v1).
-package client
+package rauthy
 
 import (
 	"bytes"

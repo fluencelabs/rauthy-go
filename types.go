@@ -1,4 +1,4 @@
-package client
+package rauthy
 
 // Wire types mirroring Rauthy's `rauthy_api_types::clients` at v0.36.2.
 //
@@ -59,8 +59,6 @@ type UpdateClientRequest struct {
 }
 
 // ClientResponse is the body returned by GET/POST/PUT on /clients[/{id}].
-//
-//nolint:revive // mirrors Rauthy's own type name; renaming would obscure the mapping
 type ClientResponse struct {
 	ID                     string                     `json:"id"`
 	Name                   *string                    `json:"name,omitempty"`
@@ -87,16 +85,12 @@ type ClientResponse struct {
 
 // ClientSecretRequest is the body of PUT /clients/{id}/secret. A nil
 // CacheCurrentHours means the previous secret stops being accepted immediately.
-//
-//nolint:revive // mirrors Rauthy's own type name; renaming would obscure the mapping
 type ClientSecretRequest struct {
 	CacheCurrentHours *int64 `json:"cache_current_hours,omitempty"`
 }
 
 // ClientSecretResponse is returned by POST and PUT on /clients/{id}/secret.
 // Secret is nil for a public client.
-//
-//nolint:revive // mirrors Rauthy's own type name; renaming would obscure the mapping
 type ClientSecretResponse struct {
 	ID           string  `json:"id"`
 	Confidential bool    `json:"confidential"`

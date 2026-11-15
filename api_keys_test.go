@@ -1,4 +1,4 @@
-package client_test
+package rauthy_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/fluencelabs/terraform-provider-rauthy/internal/client"
+	"github.com/fluencelabs/terraform-provider-rauthy/rauthy"
 )
 
 const twoAPIKeysJSON = `{"keys":[` +
@@ -39,10 +39,10 @@ func TestCreateAPIKey_ReadsAPlainTextSecret(t *testing.T) {
 	})
 
 	exp := int64(1900000000)
-	got, err := c.CreateAPIKey(context.Background(), client.APIKeyRequest{
+	got, err := c.CreateAPIKey(context.Background(), rauthy.APIKeyRequest{
 		Name:   "deploy",
 		Exp:    &exp,
-		Access: []client.APIKeyAccess{{Group: "Users", AccessRights: []string{"read"}}},
+		Access: []rauthy.APIKeyAccess{{Group: "Users", AccessRights: []string{"read"}}},
 	})
 	if err != nil {
 		t.Fatalf("CreateAPIKey: %v", err)
@@ -96,11 +96,11 @@ func TestCreateAPIKey_ReportsTheErrorEnvelope(t *testing.T) {
 		_, _ = w.Write([]byte(`{"timestamp":1,"error":"BadRequest","message":"UNIQUE constraint failed"}`))
 	})
 
-	_, err := c.CreateAPIKey(context.Background(), client.APIKeyRequest{Name: "deploy"})
+	_, err := c.CreateAPIKey(context.Background(), rauthy.APIKeyRequest{Name: "deploy"})
 	if err == nil {
 		t.Fatal("want an error")
 	}
-	var apiErr *client.APIError
+	var apiErr *rauthy.APIError
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("want an *APIError, got %T: %v", err, err)
 	}
@@ -151,7 +151,7 @@ func TestGetAPIKey_SyntheticNotFound(t *testing.T) {
 		t.Fatalf("GetAPIKey: %v", err)
 	}
 	_, err := c.GetAPIKey(context.Background(), "absent")
-	if !client.IsNotFound(err) {
+	if !rauthy.IsNotFound(err) {
 		t.Errorf("want a 404, got %v", err)
 	}
 }
@@ -168,9 +168,9 @@ func TestUpdateAPIKey_SendsTheNameInTheBody(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	err := c.UpdateAPIKey(context.Background(), "deploy", client.APIKeyRequest{
+	err := c.UpdateAPIKey(context.Background(), "deploy", rauthy.APIKeyRequest{
 		Name:   "deploy",
-		Access: []client.APIKeyAccess{},
+		Access: []rauthy.APIKeyAccess{},
 	})
 	if err != nil {
 		t.Fatalf("UpdateAPIKey: %v", err)
