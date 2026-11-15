@@ -132,6 +132,8 @@ func coveredTypes() []coveredType {
 		{value: rauthy.UpdateClientRequest{}, schema: "UpdateClientRequest", request: true, goOnly: []string{"id"}},
 		{value: rauthy.ClientResponse{}, schema: "ClientResponse"},
 		{value: rauthy.ScimClientRequestResponse{}, schema: "ScimClientRequestResponse", request: true},
+		{value: rauthy.ScopeRequest{}, schema: "ScopeRequest", request: true},
+		{value: rauthy.ScopeResponse{}, schema: "ScopeResponse"},
 		{value: rauthy.ClientSecretRequest{}, schema: "ClientSecretRequest", request: true},
 		{value: rauthy.ClientSecretResponse{}, schema: "ClientSecretResponse"},
 		{value: rauthy.APIKeyRequest{}, schema: "ApiKeyRequest", request: true},
@@ -172,8 +174,6 @@ func coveredTypes() []coveredType {
 func knownGaps() []coveredType {
 	roleMeta := []string{"meta"}
 	return []coveredType{
-		{value: rauthy.ScopeRequest{}, schema: "ScopeRequest", request: true, missing: []string{"claims_at_root"}},
-		{value: rauthy.ScopeResponse{}, schema: "ScopeResponse", missing: []string{"claims_at_root"}},
 		{value: rauthy.RoleRequest{}, schema: "RoleRequest", request: true, missing: roleMeta},
 		{value: rauthy.RoleResponse{}, schema: "RoleResponse", missing: roleMeta},
 		{value: rauthy.GroupRequest{}, schema: "GroupRequest", request: true, missing: roleMeta},
