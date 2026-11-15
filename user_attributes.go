@@ -58,11 +58,16 @@ const userAttrPathBase = "/users/attr"
 // apply independent resources in parallel — ten at a time by default — which
 // makes overlapping creates the normal case rather than an unlucky one.
 //
-// Writes are therefore serialised through Client.userAttrMu. That covers this
-// process, which is all that can be covered: two processes writing to one
-// instance can still race each other, and so can the Admin UI. Reads are
-// deliberately left unserialised — they do not mutate the list, and blocking
-// them would not make a concurrently corrupted list any more accurate.
+// Writes are therefore serialised through Client.userAttrMu, and that is all
+// the lock does. It belongs to one Client value, not to the process: two
+// Clients writing to one instance, in one process or in several, still race
+// each other, and so does the Admin UI, so callers that need the ordering share
+// one Client. It also orders only the writes this client is waiting on: a write
+// abandoned on an http.Client timeout or a cancelled context releases the lock
+// as soon as the client stops waiting, while the server may still be running
+// it, and the next queued write can overlap it. Reads are deliberately left
+// unserialised — they do not mutate the list, and blocking them would not make
+// a concurrently corrupted list any more accurate.
 //
 // If a Rauthy release makes these writes atomic, the mutex can go.
 
