@@ -14,10 +14,14 @@ import (
 	"time"
 )
 
-// Retry defaults. Four attempts with a 200ms base spend under two seconds in
-// the worst case, which is short enough that a caller (a `terraform apply`, say)
-// does not look hung and long enough to ride out a reverse proxy reloading or a Rauthy pod
-// being rescheduled.
+// Retry defaults. Four attempts with a 200ms base pause for at most 1.4 seconds
+// in all between attempts (backoff windows of 200ms, 400ms and 800ms), which is
+// short enough that a caller (a `terraform apply`, say) does not look hung and
+// long enough to ride out a reverse proxy reloading or a Rauthy pod being
+// rescheduled. That bound covers the pauses only: each attempt also lasts as
+// long as the server takes to answer, up to the http.Client timeout (30 seconds
+// by default), and a Retry-After header can stretch a pause to
+// maxHonouredRetryAfter.
 const (
 	defaultMaxAttempts = 4
 	defaultBaseDelay   = 200 * time.Millisecond
@@ -78,7 +82,7 @@ func (c *Client) send(
 			lastErr = newAPIError(method, path, resp.status, resp.body)
 		}
 
-		if attempt >= c.retry.maxAttempts || !c.retryable(ctx, method, path, status, err) {
+		if attempt >= c.retry.maxAttempts || !c.retryable(method, path, status, err) {
 			return nil, lastErr
 		}
 		delay, ok := c.delayFor(attempt, retryAfter)
@@ -141,9 +145,17 @@ func (c *Client) attempt(
 // re-run, while retrying a create that actually succeeded leaves a duplicate
 // user behind that the caller does not know about.
 //
+// What is retried at all: a 429, a 5xx, and a transport failure — a refused
+// dial, a reset, an EOF. Never retried, whatever the method: any other 4xx, a
+// 3xx, and an attempt that ended because a deadline passed, be it the
+// http.Client timeout or the caller's context. A request that timed out may
+// still be running on the server, and re-sending it would overlap it there;
+// with a 30 second timeout it would also turn a hung server into minutes of
+// waiting.
+//
 // GET, PUT and DELETE are idempotent across this API — Rauthy's PUTs are full
 // replacements and its DELETEs answer the same way for an object that is
-// already gone — so they retry on anything transient.
+// already gone — so they retry on every failure in the first list.
 //
 // POST is not, in general, and gets two narrow exemptions:
 //
@@ -162,8 +174,8 @@ func (c *Client) attempt(
 // /api_keys/{name}/secret — are the exception the other way: each one mints a
 // new secret, so re-sending one that committed rotates twice. They get the
 // POST rule.
-func (c *Client) retryable(ctx context.Context, method, path string, status int, err error) bool {
-	if !retryableFailure(ctx, status, err) {
+func (c *Client) retryable(method, path string, status int, err error) bool {
+	if !retryableFailure(status, err) {
 		return false
 	}
 	switch method {
@@ -248,25 +260,23 @@ func (p retryPolicy) validate() error {
 // question of which method produced it. 4xx other than 429 are the caller's own
 // doing — a malformed body, a missing right — and will fail identically however
 // many times they are re-sent.
-func retryableFailure(ctx context.Context, status int, err error) bool {
+func retryableFailure(status int, err error) bool {
 	if err != nil {
-		return isTransport(ctx, err)
+		return isTransport(err)
 	}
 	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
 }
 
-// isTransport separates a failed exchange from the failures that are ours: a
-// request we could not build, or a context the caller ended.
-//
-// The caller's context decides the second, not the error: an http.Client
-// timeout also matches context.DeadlineExceeded, but while ctx is still live
-// it is the client's own limit on one attempt and counts as a transport
-// failure.
-func isTransport(ctx context.Context, err error) bool {
+// isTransport separates a failed exchange from the failures that are ours or
+// that a retry cannot fix: a request we could not build, and an attempt that
+// ran out of time. The last covers both a context the
+// caller ended and an http.Client timeout, which net/http also reports as
+// context.DeadlineExceeded; neither is retried (see retryable for why).
+func isTransport(err error) bool {
 	if _, ok := errors.AsType[*buildError](err); ok {
 		return false
 	}
-	return ctx.Err() == nil
+	return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
 }
 
 // sentNothing reports whether err proves the request never left the client.

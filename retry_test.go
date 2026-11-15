@@ -458,7 +458,7 @@ func TestRetry_SecretRotationIsRetriedOnTooManyRequests(t *testing.T) {
 }
 
 // slowFirstServer holds its first request past the client's timeout and
-// answers the rest at once.
+// answers the rest at once, so a retry would succeed.
 func slowFirstServer(t *testing.T, hold time.Duration, body string) (string, *atomic.Int32) {
 	t.Helper()
 
@@ -477,42 +477,44 @@ func slowFirstServer(t *testing.T, hold time.Duration, body string) (string, *at
 	return srv.URL, &calls
 }
 
-// An http.Client timeout is the client's own, not the caller giving up, so an
-// idempotent call is retried after it.
-func TestRetry_HTTPClientTimeoutIsRetriedForIdempotentCalls(t *testing.T) {
+// An attempt cut off by the http.Client timeout may still be running on the
+// server, so it is not re-sent, whatever the method.
+func TestRetry_HTTPClientTimeoutIsNotRetried(t *testing.T) {
 	t.Parallel()
 
-	url, calls := slowFirstServer(t, 5*time.Second, `{"id":"u1","email":"a@example.com"}`)
-	c, err := rauthy.New(url, "tf$secret", retryTestPolicy(),
-		rauthy.WithHTTPClient(&http.Client{Timeout: 100 * time.Millisecond}))
-	if err != nil {
-		t.Fatalf("New: %v", err)
+	calls := map[string]func(*rauthy.Client) error{
+		"GET": func(c *rauthy.Client) error {
+			_, err := c.GetUser(t.Context(), "u1")
+			return err
+		},
+		"PUT": func(c *rauthy.Client) error {
+			return c.UpdateUserAttr(t.Context(), "dept", rauthy.UserAttrRequest{Name: "dept"})
+		},
+		"DELETE": func(c *rauthy.Client) error {
+			return c.DeleteUser(t.Context(), "u1")
+		},
+		"POST": func(c *rauthy.Client) error {
+			_, err := c.CreateUser(t.Context(), rauthy.NewUserRequest{Email: "a@example.com"})
+			return err
+		},
 	}
+	for method, call := range calls {
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
 
-	if _, err = c.GetUser(t.Context(), "u1"); err != nil {
-		t.Fatalf("GetUser: %v", err)
-	}
-	if got := calls.Load(); got != 2 {
-		t.Errorf("requests = %d, want 2", got)
-	}
-}
-
-// The same timeout on a create may sit on top of a committed one.
-func TestRetry_HTTPClientTimeoutIsNotRetriedForCreatingPOST(t *testing.T) {
-	t.Parallel()
-
-	url, calls := slowFirstServer(t, 5*time.Second, `{"id":"u1","email":"a@example.com"}`)
-	c, err := rauthy.New(url, "tf$secret", retryTestPolicy(),
-		rauthy.WithHTTPClient(&http.Client{Timeout: 100 * time.Millisecond}))
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-
-	if _, err = c.CreateUser(t.Context(), rauthy.NewUserRequest{Email: "a@example.com"}); err == nil {
-		t.Fatal("CreateUser: want a timeout error")
-	}
-	if got := calls.Load(); got != 1 {
-		t.Errorf("requests = %d, want 1", got)
+			url, served := slowFirstServer(t, 5*time.Second, `{"id":"u1","email":"a@example.com"}`)
+			c, err := rauthy.New(url, "tf$secret", retryTestPolicy(),
+				rauthy.WithHTTPClient(&http.Client{Timeout: 100 * time.Millisecond}))
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if err = call(c); !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("err = %v, want the client timeout", err)
+			}
+			if got := served.Load(); got != 1 {
+				t.Errorf("requests = %d, want 1", got)
+			}
+		})
 	}
 }
 

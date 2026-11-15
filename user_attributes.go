@@ -62,12 +62,18 @@ const userAttrPathBase = "/users/attr"
 // the lock does. It belongs to one Client value, not to the process: two
 // Clients writing to one instance, in one process or in several, still race
 // each other, and so does the Admin UI, so callers that need the ordering share
-// one Client. It also orders only the writes this client is waiting on: a write
-// abandoned on an http.Client timeout or a cancelled context releases the lock
-// as soon as the client stops waiting, while the server may still be running
-// it, and the next queued write can overlap it. Reads are deliberately left
-// unserialised — they do not mutate the list, and blocking them would not make
-// a concurrently corrupted list any more accurate.
+// one Client. It also orders only the writes this client is waiting on, which
+// leaves two overlaps it cannot prevent. A write abandoned on an http.Client
+// timeout or a cancelled context releases the lock as soon as the client stops
+// waiting, while the server may still be running it, so the next queued write
+// can overlap it; the abandoned write itself is not retried. And a PUT or
+// DELETE whose connection broke mid-exchange (a reset, an EOF) is retried
+// under the lock, so the retry can overlap its own first attempt if that one
+// reached the server. A POST is not retried once it may have been sent.
+//
+// Reads are deliberately left unserialised — they do not mutate the list, and
+// blocking them would not make a concurrently corrupted list any more
+// accurate.
 //
 // If a Rauthy release makes these writes atomic, the mutex can go.
 

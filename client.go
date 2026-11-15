@@ -55,8 +55,14 @@ func WithHTTPClient(hc *http.Client) Option {
 // request, with exponential backoff starting at baseDelay and capped at
 // maxDelay. Only failures that are safe to repeat are retried (see retry.go).
 //
-// The defaults (4 attempts, 200ms base, 5s cap) ride out a proxy reload or a
-// rescheduled Rauthy pod in under two seconds; a failure that outlives them is
+// Retried are a 429, a 5xx and a transport failure such as a reset, for GET,
+// PUT and DELETE; a creating POST and a secret rotation only on a 429 or when nothing
+// was sent. A request that timed out, on the http.Client timeout or the
+// caller's context, is never retried: it may still be running on the server.
+//
+// The defaults (4 attempts, 200ms base, 5s cap) pause for at most 1.4 seconds
+// in all between attempts, enough to ride out a proxy reload or a rescheduled
+// Rauthy pod, on top of the attempts themselves; a failure that outlives them is
 // usually one a human should see rather than one worth hammering on. Raise the
 // budget only when the network to Rauthy is known to be flaky: a large one
 // turns a visible failure into a silent multi-minute stall.
