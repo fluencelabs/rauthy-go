@@ -90,6 +90,9 @@ Two layers, in two repositories:
 
 The OpenAPI document cannot express value ranges, so the contract tests check
 field sets and types, not the constraints in `validation.go`.
+`TestSchemaCoverage` compares the field sets of the wire types it lists with
+the spec's schemas; the types that still miss spec properties are recorded in
+its `knownGaps` table, property by property, and are not fixed yet.
 
 ## Refreshing the spec
 

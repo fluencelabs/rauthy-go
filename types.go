@@ -40,6 +40,10 @@ type ScimClientRequestResponse struct {
 // PUT is a full replacement: every non-pointer field below is required by
 // Rauthy's deserializer, so the caller must supply a value even for settings it
 // does not care about. Omitting Enabled or FlowsEnabled is a 400, not a no-op.
+//
+// Optional list fields carry omitempty, so an empty list (as read from GET) is
+// sent as absent rather than as []; the required lists (RedirectURIs,
+// FlowsEnabled, Scopes, DefaultScopes) are always sent.
 type UpdateClientRequest struct {
 	ID                     string                     `json:"id"`
 	Name                   *string                    `json:"name,omitempty"`
@@ -78,8 +82,9 @@ type UpdateClientRequest struct {
 }
 
 // ClientResponse is the body returned by GET/POST/PUT on /clients[/{id}].
-// The fields mean what they mean on UpdateClientRequest. Scim is absent from
-// the GET /clients listing; only GET /clients/{id} returns it.
+// The fields mean what they mean on UpdateClientRequest. The spec uses this one
+// schema for the listing too, but its GET /clients description says the listing
+// leaves out SCIM configurations, which only GET /clients/{id} includes.
 type ClientResponse struct {
 	ID                     string                     `json:"id"`
 	Name                   *string                    `json:"name,omitempty"`
@@ -111,8 +116,9 @@ type ClientResponse struct {
 // UpdateRequest returns a PUT /clients/{id} body that keeps every setting of
 // c. Because the PUT replaces the client wholesale, start from this and change
 // only what the update is about: a body assembled field by field resets
-// whatever it leaves out. Build it from GetClient, not from a listing entry,
-// which carries no SCIM block. The result shares no memory with c.
+// whatever it leaves out. Build it from GetClient, not from a listing entry:
+// the spec describes the GET /clients listing as leaving out SCIM. The result
+// shares no memory with c.
 func (c *ClientResponse) UpdateRequest() UpdateClientRequest {
 	return UpdateClientRequest{
 		ID:                     c.ID,

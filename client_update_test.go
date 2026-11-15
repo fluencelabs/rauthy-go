@@ -196,3 +196,44 @@ func jsonEqual(t *testing.T, a, b json.RawMessage) bool {
 	}
 	return reflect.DeepEqual(x, y)
 }
+
+// An empty optional list read from GET goes back as absent, not as []: the
+// optional list fields carry omitempty. Required lists keep [].
+func TestClientResponse_UpdateRequestSendsEmptyOptionalListsAsAbsent(t *testing.T) {
+	t.Parallel()
+
+	var got rauthy.ClientResponse
+	err := json.Unmarshal([]byte(`{
+		"id": "example-app", "enabled": true, "confidential": false,
+		"redirect_uris": [], "flows_enabled": [], "scopes": [], "default_scopes": [],
+		"post_logout_redirect_uris": [], "allowed_origins": [], "challenges": [],
+		"contacts": [], "allowed_resources": [], "default_aud": [],
+		"access_token_alg": "EdDSA", "id_token_alg": "EdDSA",
+		"auth_code_lifetime": 60, "access_token_lifetime": 600,
+		"force_mfa": false, "claims_at_root": false
+	}`), &got)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	raw, err := json.Marshal(got.UpdateRequest())
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var body map[string]json.RawMessage
+	if err = json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	for _, name := range []string{
+		"post_logout_redirect_uris", "allowed_origins", "challenges", "contacts", "allowed_resources", "default_aud",
+	} {
+		if v, ok := body[name]; ok {
+			t.Errorf("empty %s is sent as %s; want it absent", name, v)
+		}
+	}
+	for _, name := range []string{"redirect_uris", "flows_enabled", "scopes", "default_scopes"} {
+		if string(body[name]) != "[]" {
+			t.Errorf("required %s = %s, want []", name, body[name])
+		}
+	}
+}

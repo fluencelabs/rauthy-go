@@ -112,17 +112,18 @@ func kindMatches(jsonType string, t reflect.Type) bool {
 // coveredType pairs a Go wire type with the component schema it mirrors.
 // goOnly names JSON fields the Go type deliberately sends although the schema
 // does not declare them; liveShape names fields typed after what a live server
-// sends rather than after the spec (the divergences documented in pam.go).
+// sends rather than after the spec (the divergences documented in pam.go);
+// missing names spec properties the Go type does not model yet (knownGaps).
 type coveredType struct {
 	value     any
 	schema    string
 	request   bool
 	goOnly    []string
 	liveShape []string
+	missing   []string
 }
 
 // coveredTypes lists the wire types whose field sets match the spec exactly.
-// A type with a known gap stays off this list until the gap is closed.
 func coveredTypes() []coveredType {
 	return []coveredType{
 		{value: rauthy.NewClientRequest{}, schema: "NewClientRequest", request: true},
@@ -161,6 +162,38 @@ func coveredTypes() []coveredType {
 			liveShape: []string{"ips"},
 		},
 		{value: rauthy.PamHostSecretResponse{}, schema: "PamHostSecretResponse"},
+	}
+}
+
+// knownGaps lists the wire types that do not yet model every spec property.
+// Each entry records exactly which properties are missing: a new gap fails the
+// test, and so does a closed one until its entry is removed. Request types in
+// this list lose the missing values on every read-modify-write.
+func knownGaps() []coveredType {
+	roleMeta := []string{"meta"}
+	return []coveredType{
+		{value: rauthy.ScopeRequest{}, schema: "ScopeRequest", request: true, missing: []string{"claims_at_root"}},
+		{value: rauthy.ScopeResponse{}, schema: "ScopeResponse", missing: []string{"claims_at_root"}},
+		{value: rauthy.RoleRequest{}, schema: "RoleRequest", request: true, missing: roleMeta},
+		{value: rauthy.RoleResponse{}, schema: "RoleResponse", missing: roleMeta},
+		{value: rauthy.GroupRequest{}, schema: "GroupRequest", request: true, missing: roleMeta},
+		{value: rauthy.GroupResponse{}, schema: "GroupResponse", missing: roleMeta},
+		{value: rauthy.UserAttrRequest{}, schema: "UserAttrConfigRequest", request: true, missing: []string{"typ"}},
+		{value: rauthy.UserAttrResponse{}, schema: "UserAttrConfigValueResponse", missing: []string{"typ"}},
+		{
+			value: rauthy.NewUserRequest{}, schema: "NewUserRequest", request: true,
+			missing: []string{"preferred_username"},
+		},
+		// Read-only fields: nothing is written back, they are only not readable.
+		{value: rauthy.UserResponse{}, schema: "UserResponse", missing: []string{
+			"auth_provider_id", "failed_login_attempts", "federation_uid", "last_failed_login",
+			"password_expires", "picture_id", "webauthn_user_id",
+		}},
+		{value: rauthy.PamUserResponse{}, schema: "PamUserResponse", missing: []string{"authorized_keys"}},
+		{
+			value: rauthy.PamUserDetailsResponse{}, schema: "PamUserDetailsResponse",
+			missing: []string{"authorized_keys"},
+		},
 	}
 }
 
@@ -229,7 +262,7 @@ func nilable(t reflect.Type) bool {
 func TestSchemaCoverage(t *testing.T) {
 	schemas := loadSpecSchemas(t)
 
-	for _, ct := range coveredTypes() {
+	for _, ct := range slices.Concat(coveredTypes(), knownGaps()) {
 		goType := reflect.TypeOf(ct.value)
 		t.Run(goType.Name()+"/"+ct.schema, func(t *testing.T) {
 			schema, ok := schemas[ct.schema]
@@ -254,23 +287,49 @@ func checkSchemaCoverage(
 	for name, prop := range schema.Properties {
 		f, ok := fields[name]
 		if !ok {
-			t.Errorf("spec property %q is not modelled; a read-modify-write would lose it", name)
+			if !slices.Contains(ct.missing, name) {
+				t.Errorf("spec property %q is not modelled; a read-modify-write would lose it", name)
+			}
 			continue
 		}
-		jt := prop.jsonType(schemas)
-		if !kindMatches(jt, f.typ) && !slices.Contains(ct.liveShape, name) {
-			t.Errorf("spec property %q is %q but the Go field is %s", name, jt, f.typ)
+		if slices.Contains(ct.missing, name) {
+			t.Errorf("spec property %q is modelled now; remove it from knownGaps", name)
 		}
-		if prop.nullable() && ct.request && !nilable(f.typ) {
-			t.Errorf("spec property %q is nullable but %s cannot send null", name, f.typ)
-		}
-		if ct.request && f.omitEmpty && slices.Contains(schema.Required, name) {
-			t.Errorf("spec property %q is required but omitempty drops its zero value", name)
+		checkPropertyType(t, name, prop, f, schemas, ct, slices.Contains(schema.Required, name))
+	}
+	for _, name := range ct.missing {
+		if _, ok := schema.Properties[name]; !ok {
+			t.Errorf("knownGaps lists %q, which the spec no longer declares", name)
 		}
 	}
 	for name := range fields {
 		if _, ok := schema.Properties[name]; !ok && !slices.Contains(ct.goOnly, name) {
 			t.Errorf("field %q is not in the spec; Rauthy would ignore it", name)
 		}
+	}
+}
+
+// checkPropertyType checks that a modelled field can carry what the spec
+// property allows, and, on a request, that it does not drop a required value.
+func checkPropertyType(
+	t *testing.T,
+	name string,
+	prop specProperty,
+	f jsonField,
+	schemas map[string]specSchema,
+	ct coveredType,
+	required bool,
+) {
+	t.Helper()
+
+	jt := prop.jsonType(schemas)
+	if !kindMatches(jt, f.typ) && !slices.Contains(ct.liveShape, name) {
+		t.Errorf("spec property %q is %q but the Go field is %s", name, jt, f.typ)
+	}
+	if prop.nullable() && ct.request && !nilable(f.typ) {
+		t.Errorf("spec property %q is nullable but %s cannot send null", name, f.typ)
+	}
+	if ct.request && f.omitEmpty && required {
+		t.Errorf("spec property %q is required but omitempty drops its zero value", name)
 	}
 }
