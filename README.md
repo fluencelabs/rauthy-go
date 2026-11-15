@@ -116,3 +116,7 @@ version and its `CHANGELOG.md` entry; merging that pull request tags `vX.Y.Z`
 and publishes the GitHub release, and `go get` picks the tag up from the module
 proxy. Before 1.0 a `feat` or a breaking change bumps the minor version and a
 `fix` the patch version. Tags are never created by hand.
+
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE).
