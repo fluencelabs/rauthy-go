@@ -26,6 +26,13 @@ rauthy_require_docker
 # user's home directory, and a /var/folders temp dir silently mounts empty.
 workdir="$(mktemp -d "$(dirname "$out")/.openapi-refresh.XXXXXX")"
 
+# The scraped body and its formatted copy live in the workdir until the copy
+# has been validated, so a failed run leaves the committed spec untouched, and
+# cleanup removes them with the workdir. The workdir sits next to $out, so the
+# final mv is a rename on one filesystem.
+scraped="$workdir/scraped.json"
+formatted="$workdir/formatted.json"
+
 cleanup() {
 	docker rm -f "$name" >/dev/null 2>&1 || true
 	rm -rf "$workdir"
@@ -61,17 +68,27 @@ TOML
 rauthy_pull_image "$image" "$workdir"
 
 echo "booting $image ..."
-docker run -d --name "$name" -p "${port}:8080" \
+# Published on loopback only: the throwaway config turns the Swagger UI on and
+# its secrets are in this file.
+docker run -d --name "$name" -p "127.0.0.1:${port}:8080" \
 	-v "$(cd "$workdir" && pwd)/config.toml:/app/config.toml:ro" \
 	"$image" >/dev/null
 
 url="http://127.0.0.1:${port}/auth/v1/docs/openapi.json"
 for _ in $(seq 1 60); do
-	if curl -sf "$url" -o "$out.tmp"; then
-		python3 -m json.tool --indent 2 "$out.tmp" >"$out"
-		rm -f "$out.tmp"
+	if curl -sf --connect-timeout 2 --max-time 10 "$url" -o "$scraped"; then
+		if ! python3 -m json.tool --indent 2 "$scraped" >"$formatted"; then
+			echo "$url did not return valid JSON; $out left unchanged" >&2
+			exit 1
+		fi
+		mv "$formatted" "$out"
 		echo "wrote $out from $image"
 		exit 0
+	fi
+	if [ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" != "true" ]; then
+		echo "$image exited before serving $url" >&2
+		docker logs "$name" >&2 || true
+		exit 1
 	fi
 	sleep 2
 done
