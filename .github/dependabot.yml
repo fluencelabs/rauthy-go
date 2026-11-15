@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # From these versions on, libopenapi and libopenapi-validator declare
+      # `go 1.26.0`, above the Go line in go.mod. Lift together with that line.
+      - dependency-name: github.com/pb33f/libopenapi
+        versions: [">= 0.39.0"]
+      - dependency-name: github.com/pb33f/libopenapi-validator
+        versions: [">= 0.14.1"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
