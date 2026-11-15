@@ -32,7 +32,7 @@ jobs:
         run: go vet ./...
       - name: Test
         # The OpenAPI contract tests run against the spec committed under
-        # mock/testdata. CI never regenerates it (that needs Docker);
+        # internal/mock/testdata. CI never regenerates it (that needs Docker);
         # `make openapi-refresh` is a manual step at Rauthy version bumps.
         run: go test ./... -count=1 -timeout 5m
       - name: Gofmt check

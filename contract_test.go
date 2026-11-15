@@ -12,16 +12,16 @@ import (
 	validator "github.com/pb33f/libopenapi-validator"
 
 	"github.com/fluencelabs/rauthy-go"
-	"github.com/fluencelabs/rauthy-go/mock"
+	"github.com/fluencelabs/rauthy-go/internal/mock"
 )
 
 // The contract tests validate the bodies this package sends, and the bodies it
 // expects back, against the OpenAPI spec Rauthy itself publishes. They catch
 // request/response drift after a Rauthy upgrade without a live instance.
 //
-// The spec is vendored under mock/testdata by `make openapi-refresh` (Docker,
-// run by hand at version bumps). Without it these tests skip rather than fail,
-// so a fresh checkout is not blocked on Docker.
+// The spec is vendored under internal/mock/testdata by `make openapi-refresh`
+// (Docker, run by hand at version bumps). Without it these tests skip rather
+// than fail, so a fresh checkout is not blocked on Docker.
 func newContractValidator(t *testing.T) validator.Validator {
 	t.Helper()
 
