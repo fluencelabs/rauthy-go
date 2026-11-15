@@ -40,22 +40,22 @@ type Client struct {
 // Option customises a Client.
 type Option func(*Client)
 
-// WithHTTPClient replaces the underlying HTTP client. Used by tests.
+// WithHTTPClient replaces the underlying HTTP client, which is how a caller sets
+// the transport, proxy, TLS configuration or timeout. The default is an
+// http.Client with a 30 second timeout.
 func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.httpClient = hc }
 }
 
-// WithRetryPolicy replaces the retry budget. Used by tests, which need a
-// backoff measured in microseconds rather than in seconds.
+// WithRetryPolicy replaces the retry budget: at most maxAttempts tries per
+// request, with exponential backoff starting at baseDelay and capped at
+// maxDelay. Only failures that are safe to repeat are retried (see retry.go).
 //
-// This is deliberately not surfaced as a provider schema attribute. The budget
-// is a property of how flaky the network between Terraform and Rauthy is, which
-// the operator cannot usefully predict at configuration time, and every value
-// worth choosing is already covered: the defaults ride out a blip, and a
-// failure that outlives them is one a human should see rather than one the
-// provider should keep hammering. Exposing `max_retries` would add a knob whose
-// only honest documentation is "leave this alone", and a wrong setting turns a
-// visible failure into a silent multi-minute stall inside an apply.
+// The defaults (4 attempts, 200ms base, 5s cap) ride out a proxy reload or a
+// rescheduled Rauthy pod in under two seconds; a failure that outlives them is
+// usually one a human should see rather than one worth hammering on. Raise the
+// budget only when the network to Rauthy is known to be flaky: a large one
+// turns a visible failure into a silent multi-minute stall.
 func WithRetryPolicy(maxAttempts int, baseDelay, maxDelay time.Duration) Option {
 	return func(c *Client) {
 		c.retry = retryPolicy{maxAttempts: maxAttempts, baseDelay: baseDelay, maxDelay: maxDelay}
