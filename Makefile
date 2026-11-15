@@ -6,7 +6,7 @@ RAUTHY_VERSION ?= 0.36.2
 SPEC := internal/mock/testdata/rauthy-openapi-$(RAUTHY_VERSION).json
 
 test:
-	go test ./... -count=1
+	go test ./... -race -count=1 -timeout 20m
 
 lint:
 	golangci-lint run

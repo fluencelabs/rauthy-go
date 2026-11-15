@@ -104,7 +104,7 @@ whatever drifted.
 ## Development
 
 ```sh
-make test   # go test ./... -count=1
+make test   # go test ./... -race -count=1 -timeout 20m
 make lint   # golangci-lint run (v2.15.0)
 ```
 
