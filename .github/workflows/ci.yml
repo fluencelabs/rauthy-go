@@ -37,6 +37,7 @@ jobs:
     if: github.event_name != 'schedule'
     name: test (go ${{ matrix.name }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -62,7 +63,9 @@ jobs:
         # The OpenAPI contract tests run against the spec committed under
         # internal/mock/testdata. CI never regenerates it (that needs Docker);
         # `make openapi-refresh` is a manual step at Rauthy version bumps.
-        run: go test ./... -race -count=1 -timeout 5m -coverprofile=coverage.out
+        # Validating against the spec is slow under -race (several minutes),
+        # hence the generous timeout.
+        run: go test ./... -race -count=1 -timeout 20m -coverprofile=coverage.out
       - name: Coverage summary
         run: |
           total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}')
