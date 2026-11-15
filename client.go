@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -42,7 +43,10 @@ type Option func(*Client)
 
 // WithHTTPClient replaces the underlying HTTP client, which is how a caller sets
 // the transport, proxy, TLS configuration or timeout. The default is an
-// http.Client with a 30 second timeout.
+// http.Client with a 30 second timeout that does not follow redirects, so the
+// API key and request bodies never travel to another location. A client given
+// here is used as it is: its redirect policy is the caller's responsibility,
+// and New does not change it. A nil client makes New fail.
 func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.httpClient = hc }
 }
@@ -56,6 +60,9 @@ func WithHTTPClient(hc *http.Client) Option {
 // usually one a human should see rather than one worth hammering on. Raise the
 // budget only when the network to Rauthy is known to be flaky: a large one
 // turns a visible failure into a silent multi-minute stall.
+//
+// A zero baseDelay retries without pausing. A negative value for any of the
+// three makes New fail.
 func WithRetryPolicy(maxAttempts int, baseDelay, maxDelay time.Duration) Option {
 	return func(c *Client) {
 		c.retry = retryPolicy{maxAttempts: maxAttempts, baseDelay: baseDelay, maxDelay: maxDelay}
@@ -76,10 +83,20 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse rauthy url %q: %w", rawURL, err)
+		// url.Error repeats the raw URL, password included, so only its cause
+		// is kept.
+		if urlErr, ok := errors.AsType[*url.Error](err); ok {
+			err = urlErr.Err
+		}
+		return nil, fmt.Errorf("parse rauthy url: %w", err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("rauthy url %q must use http or https", rawURL)
+		return nil, fmt.Errorf("rauthy url %q must use http or https", u.Redacted())
+	}
+	// Request paths are appended to the URL as a string, so a query or
+	// fragment would end up in front of every one of them.
+	if u.RawQuery != "" || u.ForceQuery || strings.Contains(rawURL, "#") {
+		return nil, fmt.Errorf("rauthy url %q must not carry a query or fragment", u.Redacted())
 	}
 
 	base := strings.TrimRight(u.String(), "/")
@@ -90,7 +107,7 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 	c := &Client{
 		baseURL:    base,
 		apiKey:     apiKey,
-		httpClient: &http.Client{Timeout: defaultTimeout},
+		httpClient: &http.Client{Timeout: defaultTimeout, CheckRedirect: noRedirects},
 		retry: retryPolicy{
 			maxAttempts: defaultMaxAttempts,
 			baseDelay:   defaultBaseDelay,
@@ -100,8 +117,19 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 	for _, o := range opts {
 		o(c)
 	}
+	if c.httpClient == nil {
+		return nil, errors.New("rauthy http client must not be nil")
+	}
+	if err = c.retry.validate(); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
+
+// noRedirects stops the default client at a 3xx. The API never redirects, and
+// following one would re-send the API key, and on a 307 or 308 the body, to
+// wherever it points; the 3xx is reported as an API error instead.
+func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 // BaseURL returns the API root, including the /auth/v1 base path.
 func (c *Client) BaseURL() string { return c.baseURL }
@@ -165,6 +193,9 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any, accep
 // root. Content negotiation is left to the caller, because the branding
 // endpoints neither send nor receive JSON.
 func (c *Client) newRequest(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
+	if err := checkPath(path); err != nil {
+		return nil, fmt.Errorf("build %s %s: %w", method, path, err)
+	}
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
 		return nil, fmt.Errorf("build %s %s: %w", method, path, err)
@@ -198,6 +229,9 @@ func (c *Client) upload(ctx context.Context, path, contentType string, body []by
 // multipartBody encodes one image as a single multipart/form-data part and
 // returns the body together with the boundary-bearing content type.
 func multipartBody(field string, img Image) ([]byte, string, error) {
+	if err := checkContentType(img.ContentType); err != nil {
+		return nil, "", err
+	}
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
 
@@ -220,4 +254,17 @@ func multipartBody(field string, img Image) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("close multipart writer: %w", closeErr)
 	}
 	return buf.Bytes(), w.FormDataContentType(), nil
+}
+
+// checkContentType refuses a declared image type that would corrupt the part
+// header it is written into: CreatePart writes it verbatim, so a CR or LF
+// would start a header of the caller's choosing.
+func checkContentType(contentType string) error {
+	if strings.ContainsAny(contentType, "\r\n") {
+		return fmt.Errorf("image content type %q must not contain CR or LF", contentType)
+	}
+	if _, _, err := mime.ParseMediaType(contentType); err != nil {
+		return fmt.Errorf("image content type %q: %w", contentType, err)
+	}
+	return nil
 }

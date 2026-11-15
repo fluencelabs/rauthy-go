@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -77,7 +78,7 @@ func (c *Client) send(
 			lastErr = newAPIError(method, path, resp.status, resp.body)
 		}
 
-		if attempt >= c.retry.maxAttempts || !c.retryable(method, path, status, err) {
+		if attempt >= c.retry.maxAttempts || !c.retryable(ctx, method, path, status, err) {
 			return nil, lastErr
 		}
 		delay, ok := c.delayFor(attempt, retryAfter)
@@ -85,9 +86,10 @@ func (c *Client) send(
 			return nil, lastErr
 		}
 		if waitErr := sleep(ctx, delay); waitErr != nil {
-			// The context died mid-backoff. Report why the request failed
-			// rather than the cancellation, so the operator sees the cause.
-			return nil, lastErr
+			// The context died mid-backoff. Report both why the request failed,
+			// so the operator sees the cause, and the cancellation, so a caller
+			// can tell that it gave up.
+			return nil, fmt.Errorf("%w (gave up waiting to retry: %w)", lastErr, waitErr)
 		}
 	}
 }
@@ -155,13 +157,23 @@ func (c *Client) attempt(
 // The one POST endpoint that is an upsert by design — POST /blacklist, see
 // BlacklistIP — opts out of that caution by path, since re-posting it only
 // rewrites an expiry it was already going to write.
-func (c *Client) retryable(method, path string, status int, err error) bool {
-	if !retryableFailure(status, err) {
+//
+// The PUTs that rotate a secret — /clients/{id}/secret and
+// /api_keys/{name}/secret — are the exception the other way: each one mints a
+// new secret, so re-sending one that committed rotates twice. They get the
+// POST rule.
+func (c *Client) retryable(ctx context.Context, method, path string, status int, err error) bool {
+	if !retryableFailure(ctx, status, err) {
 		return false
 	}
 	switch method {
-	case http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete:
+	case http.MethodGet, http.MethodHead, http.MethodDelete:
 		return true
+	case http.MethodPut:
+		if !strings.HasSuffix(path, secretRotationSuffix) {
+			return true
+		}
+		return status == http.StatusTooManyRequests || (err != nil && sentNothing(err))
 	case http.MethodPost:
 		if path == blacklistPathBase || status == http.StatusTooManyRequests {
 			return true
@@ -171,6 +183,10 @@ func (c *Client) retryable(method, path string, status int, err error) bool {
 		return false
 	}
 }
+
+// secretRotationSuffix ends the path of every PUT that rotates a secret. An
+// identifier cannot forge it: url.PathEscape turns a "/" inside one into %2F.
+const secretRotationSuffix = "/secret"
 
 // delayFor returns how long to wait before the next attempt, and whether to
 // wait at all. A Retry-After from the server wins over our own backoff: it is
@@ -195,34 +211,62 @@ func (c *Client) delayFor(attempt int, retryAfter string) (time.Duration, bool) 
 // jitter down to zero would let a fleet of parallel applies retry almost
 // immediately and re-collide; keeping the floor at half the window spreads them
 // out without throwing the backoff away.
+//
+// A zero base delay means no delay at all. The window is clamped to maxDelay
+// before the shift, not after it: a shift that pushed bits out of the int64
+// could otherwise leave a small positive window below the cap.
 func (p retryPolicy) backoff(attempt int) time.Duration {
-	window := p.baseDelay << (attempt - 1)
-	if window > p.maxDelay || window <= 0 {
-		window = p.maxDelay
+	if p.baseDelay <= 0 || p.maxDelay <= 0 {
+		return 0
+	}
+	window := p.maxDelay
+	if shift := attempt - 1; shift < maxBackoffShift && p.baseDelay <= p.maxDelay>>shift {
+		window = p.baseDelay << shift
 	}
 	const jitterFloor = 2 // half the window, the lowest a jittered delay may fall to
 	floor := window / jitterFloor
 	return floor + time.Duration(rand.Int64N(int64(floor)+1)) //nolint:gosec // scheduling jitter, not a secret
 }
 
+// maxBackoffShift is the widest shift of a positive int64 that can still be
+// compared against the cap.
+const maxBackoffShift = 63
+
+// validate refuses a negative attempt budget or delay, neither of which has a
+// meaning.
+func (p retryPolicy) validate() error {
+	if p.maxAttempts < 0 || p.baseDelay < 0 || p.maxDelay < 0 {
+		return fmt.Errorf(
+			"rauthy retry policy must not be negative: %d attempts, %v base delay, %v max delay",
+			p.maxAttempts, p.baseDelay, p.maxDelay,
+		)
+	}
+	return nil
+}
+
 // retryableFailure reports whether a failure is transient at all, before any
 // question of which method produced it. 4xx other than 429 are the caller's own
 // doing — a malformed body, a missing right — and will fail identically however
 // many times they are re-sent.
-func retryableFailure(status int, err error) bool {
+func retryableFailure(ctx context.Context, status int, err error) bool {
 	if err != nil {
-		return isTransport(err)
+		return isTransport(ctx, err)
 	}
 	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
 }
 
 // isTransport separates a failed exchange from the failures that are ours: a
 // request we could not build, or a context the caller ended.
-func isTransport(err error) bool {
+//
+// The caller's context decides the second, not the error: an http.Client
+// timeout also matches context.DeadlineExceeded, but while ctx is still live
+// it is the client's own limit on one attempt and counts as a transport
+// failure.
+func isTransport(ctx context.Context, err error) bool {
 	if _, ok := errors.AsType[*buildError](err); ok {
 		return false
 	}
-	return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
+	return ctx.Err() == nil
 }
 
 // sentNothing reports whether err proves the request never left the client.
