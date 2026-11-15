@@ -4,9 +4,10 @@ on:
   push:
     branches: [main]
 
+# release-please acts with the bot token below, not with GITHUB_TOKEN, so the
+# workflow token needs nothing beyond reading the repository.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   # A library release is the tag, the GitHub release and CHANGELOG.md: the Go
@@ -16,4 +17,6 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # A pull request opened with GITHUB_TOKEN would not trigger the ci
+          # workflow; the bot token does, so the release PR gets its checks.
+          token: ${{ secrets.FLUENCEBOT_RELEASE_PLEASE_PAT }}
