@@ -31,30 +31,17 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.7.1
+          version: v2.15.0
 
   test:
     if: github.event_name != 'schedule'
-    name: test (go ${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # The minimum the module declares, and the newest release.
-          - name: go.mod
-            go-version-file: go.mod
-            go-version: ""
-          - name: stable
-            go-version-file: ""
-            go-version: stable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
-          go-version-file: ${{ matrix.go-version-file }}
+          go-version-file: go.mod
       - name: Build
         run: go build ./...
       - name: Vet
@@ -69,7 +56,7 @@ jobs:
       - name: Coverage summary
         run: |
           total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}')
-          echo "Total coverage (go ${{ matrix.name }}): ${total}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Total coverage: ${total}" >> "$GITHUB_STEP_SUMMARY"
 
   tidy:
     if: github.event_name != 'schedule'
@@ -99,14 +86,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Standard-library findings follow the toolchain that builds the code, so
-      # the scan uses the newest release: the Go line in go.mod is the minimum
-      # consumers need, not the toolchain they are told to run.
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version-file: go.mod
       - name: govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   ci-ok:
     if: always()

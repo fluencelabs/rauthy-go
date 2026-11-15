@@ -105,7 +105,7 @@ whatever drifted.
 
 ```sh
 make test   # go test ./... -count=1
-make lint   # golangci-lint run (v2.7.1)
+make lint   # golangci-lint run (v2.15.0)
 ```
 
 ## Releases
