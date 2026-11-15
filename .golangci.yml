@@ -1,7 +1,7 @@
 # This file is licensed under the terms of the MIT license https://opensource.org/license/mit
 # Copyright (c) 2021-2025 Marat Reymers
 
-## Strict golangci-lint config for golangci-lint v2.7.1
+## Strict golangci-lint config for golangci-lint v2.15.0
 #
 # Very strict, but not extremely strict. Adapt it to suit your needs.
 
@@ -232,7 +232,7 @@ linters:
       # Default: [ switch ]
       check:
         - switch
-        - map
+        - mapliteral
 
     exhaustruct:
       # List of regular expressions to match type names that should be excluded from processing.

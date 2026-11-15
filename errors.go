@@ -65,8 +65,7 @@ func IsForbidden(err error) bool { return hasStatus(err, http.StatusForbidden) }
 func IsUnauthorized(err error) bool { return hasStatus(err, http.StatusUnauthorized) }
 
 func hasStatus(err error, status int) bool {
-	var apiErr *APIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*APIError](err); ok {
 		return apiErr.StatusCode == status
 	}
 	return false

@@ -5,9 +5,23 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # New advisories land without a commit here: a nightly govulncheck run
+  # reports them before an unrelated pull request trips over them.
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  # A pull request shares one group, so a new push cancels the superseded run.
+  # Other runs get a group of their own: every main commit is checked.
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   lint:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,10 +31,12 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.7.1
+          version: v2.15.0
 
-  build:
+  test:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -34,12 +50,56 @@ jobs:
         # The OpenAPI contract tests run against the spec committed under
         # internal/mock/testdata. CI never regenerates it (that needs Docker);
         # `make openapi-refresh` is a manual step at Rauthy version bumps.
-        run: go test ./... -count=1 -timeout 5m
+        # Validating against the spec is slow under -race (several minutes),
+        # hence the generous timeout.
+        run: go test ./... -race -count=1 -timeout 20m -coverprofile=coverage.out
+      - name: Coverage summary
+        run: |
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}')
+          echo "Total coverage: ${total}" >> "$GITHUB_STEP_SUMMARY"
+
+  tidy:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go mod tidy leaves no diff
+        run: |
+          go mod tidy
+          if ! git diff --exit-code go.mod go.sum; then
+            echo "go.mod/go.sum are not tidy: run 'go mod tidy' and commit the result"
+            exit 1
+          fi
       - name: Gofmt check
         run: |
           out=$(gofmt -l .)
           if [ -n "$out" ]; then
             echo "Files need gofmt:"
             echo "$out"
+            exit 1
+          fi
+
+  vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  ci-ok:
+    if: always()
+    needs: [lint, test, tidy, vuln]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "A required job failed or was cancelled"
             exit 1
           fi

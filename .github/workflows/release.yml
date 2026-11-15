@@ -1,0 +1,28 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+# release-please acts with the bot token below, not with GITHUB_TOKEN, so the
+# workflow token needs nothing beyond reading the repository.
+permissions:
+  contents: read
+
+# Release runs queue rather than cancel: a cancelled run could leave a tag
+# without its GitHub release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # A library release is the tag, the GitHub release and CHANGELOG.md: the Go
+  # module proxy serves the code straight from the tag, nothing is built here.
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          # A pull request opened with GITHUB_TOKEN would not trigger the ci
+          # workflow; the bot token does, so the release PR gets its checks.
+          token: ${{ secrets.FLUENCEBOT_RELEASE_PLEASE_PAT }}

@@ -219,8 +219,7 @@ func retryableFailure(status int, err error) bool {
 // isTransport separates a failed exchange from the failures that are ours: a
 // request we could not build, or a context the caller ended.
 func isTransport(err error) bool {
-	var buildErr *buildError
-	if errors.As(err, &buildErr) {
+	if _, ok := errors.AsType[*buildError](err); ok {
 		return false
 	}
 	return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
@@ -231,8 +230,7 @@ func isTransport(err error) bool {
 // a write error, a reset, an EOF, a timeout — leaves open the possibility that
 // the server read the request and acted on it.
 func sentNothing(err error) bool {
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
+	if _, ok := errors.AsType[*net.DNSError](err); ok {
 		return true
 	}
 	var opErr *net.OpError

@@ -1,5 +1,7 @@
 # rauthy-go
 
+[![ci](https://github.com/fluencelabs/rauthy-go/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fluencelabs/rauthy-go/actions/workflows/ci.yml)
+
 A thin Go client for the [Rauthy](https://github.com/sebadob/rauthy) admin API
 (`/auth/v1`): OIDC clients with their secrets and branding images, users, user attributes,
 roles, groups, scopes, auth providers, API keys, the IP blacklist, the password
@@ -102,6 +104,19 @@ whatever drifted.
 ## Development
 
 ```sh
-make test   # go test ./... -count=1
-make lint   # golangci-lint run (v2.7.1)
+make test   # go test ./... -race -count=1 -timeout 20m
+make lint   # golangci-lint run (v2.15.0)
 ```
+
+## Releases
+
+Commits on `main` follow [Conventional Commits](https://www.conventionalcommits.org/).
+release-please reads them and keeps a release pull request open with the next
+version and its `CHANGELOG.md` entry; merging that pull request tags `vX.Y.Z`
+and publishes the GitHub release, and `go get` picks the tag up from the module
+proxy. Before 1.0 a `feat` or a breaking change bumps the minor version and a
+`fix` the patch version. Tags are never created by hand.
+
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE).

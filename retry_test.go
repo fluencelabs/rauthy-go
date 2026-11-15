@@ -349,8 +349,7 @@ func TestRetry_ConnectionErrors(t *testing.T) {
 	if _, err = c.GetUser(t.Context(), "u1"); err == nil {
 		t.Fatal("GetUser: want a connection error")
 	}
-	var apiErr *rauthy.APIError
-	if errors.As(err, &apiErr) {
+	if _, ok := errors.AsType[*rauthy.APIError](err); ok {
 		t.Errorf("err = %v, want a transport error rather than an APIError", err)
 	}
 }
