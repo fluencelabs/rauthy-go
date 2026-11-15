@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.7.1
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        # The OpenAPI contract tests run against the spec committed under
+        # mock/testdata. CI never regenerates it (that needs Docker);
+        # `make openapi-refresh` is a manual step at Rauthy version bumps.
+        run: go test ./... -count=1 -timeout 5m
+      - name: Gofmt check
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
