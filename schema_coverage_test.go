@@ -2,7 +2,6 @@ package rauthy_test
 
 import (
 	"encoding/json"
-	"errors"
 	"maps"
 	"os"
 	"reflect"
@@ -201,9 +200,6 @@ func loadSpecSchemas(t *testing.T) map[string]specSchema {
 	t.Helper()
 
 	path, err := mock.SpecPath()
-	if errors.Is(err, mock.ErrNoSpec) {
-		t.Skip("no vendored Rauthy OpenAPI spec; run `make openapi-refresh` to generate it")
-	}
 	if err != nil {
 		t.Fatalf("locate spec: %v", err)
 	}
