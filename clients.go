@@ -36,7 +36,9 @@ func (c *Client) GetClient(ctx context.Context, id string) (*ClientResponse, err
 }
 
 // UpdateClient issues PUT /clients/{id}, replacing the client's configuration
-// wholesale. Requires Clients:Update.
+// wholesale: a field req leaves out is reset, not kept. Build req with
+// ClientResponse.UpdateRequest from a GetClient result and change only what the
+// update is about. Requires Clients:Update.
 func (c *Client) UpdateClient(ctx context.Context, id string, req UpdateClientRequest) (*ClientResponse, error) {
 	var out ClientResponse
 	if err := c.do(ctx, http.MethodPut, clientPath(id), req, &out); err != nil {

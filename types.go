@@ -1,5 +1,11 @@
 package rauthy
 
+import (
+	"bytes"
+	"encoding/json"
+	"slices"
+)
+
 // Wire types mirroring Rauthy's `rauthy_api_types::clients` at v0.36.2.
 //
 // Field sets and JSON names are load-bearing: the API silently ignores unknown
@@ -56,9 +62,24 @@ type UpdateClientRequest struct {
 	BackchannelLogoutURI   *string                    `json:"backchannel_logout_uri,omitempty"`
 	RestrictGroupPrefix    *string                    `json:"restrict_group_prefix,omitempty"`
 	Scim                   *ScimClientRequestResponse `json:"scim,omitempty"`
+	// AllowedResources is the RFC 8707 allow-list of resource indicators the
+	// client may request. Empty rejects any `resource` parameter.
+	AllowedResources []string `json:"allowed_resources,omitempty"`
+	// DefaultAud lists audiences always added to the client's tokens,
+	// whatever `resource` the request carries.
+	DefaultAud []string `json:"default_aud,omitempty"`
+	// Claims holds admin-defined custom claims emitted into client_credentials
+	// tokens: a JSON object of at most 1024 serialized characters, passed
+	// through verbatim.
+	Claims json.RawMessage `json:"claims,omitempty"`
+	// ClaimsAtRoot emits Claims at the token root instead of nested under
+	// `custom`.
+	ClaimsAtRoot bool `json:"claims_at_root"`
 }
 
 // ClientResponse is the body returned by GET/POST/PUT on /clients[/{id}].
+// The fields mean what they mean on UpdateClientRequest. Scim is absent from
+// the GET /clients listing; only GET /clients/{id} returns it.
 type ClientResponse struct {
 	ID                     string                     `json:"id"`
 	Name                   *string                    `json:"name,omitempty"`
@@ -81,6 +102,62 @@ type ClientResponse struct {
 	BackchannelLogoutURI   *string                    `json:"backchannel_logout_uri,omitempty"`
 	RestrictGroupPrefix    *string                    `json:"restrict_group_prefix,omitempty"`
 	Scim                   *ScimClientRequestResponse `json:"scim,omitempty"`
+	AllowedResources       []string                   `json:"allowed_resources,omitempty"`
+	DefaultAud             []string                   `json:"default_aud,omitempty"`
+	Claims                 json.RawMessage            `json:"claims,omitempty"`
+	ClaimsAtRoot           bool                       `json:"claims_at_root"`
+}
+
+// UpdateRequest returns a PUT /clients/{id} body that keeps every setting of
+// c. Because the PUT replaces the client wholesale, start from this and change
+// only what the update is about: a body assembled field by field resets
+// whatever it leaves out. Build it from GetClient, not from a listing entry,
+// which carries no SCIM block. The result shares no memory with c.
+func (c *ClientResponse) UpdateRequest() UpdateClientRequest {
+	return UpdateClientRequest{
+		ID:                     c.ID,
+		Name:                   clonePtr(c.Name),
+		Confidential:           c.Confidential,
+		RedirectURIs:           slices.Clone(c.RedirectURIs),
+		PostLogoutRedirectURIs: slices.Clone(c.PostLogoutRedirectURIs),
+		AllowedOrigins:         slices.Clone(c.AllowedOrigins),
+		Enabled:                c.Enabled,
+		FlowsEnabled:           slices.Clone(c.FlowsEnabled),
+		AccessTokenAlg:         c.AccessTokenAlg,
+		IDTokenAlg:             c.IDTokenAlg,
+		AuthCodeLifetime:       c.AuthCodeLifetime,
+		AccessTokenLifetime:    c.AccessTokenLifetime,
+		Scopes:                 slices.Clone(c.Scopes),
+		DefaultScopes:          slices.Clone(c.DefaultScopes),
+		Challenges:             slices.Clone(c.Challenges),
+		ForceMFA:               c.ForceMFA,
+		ClientURI:              clonePtr(c.ClientURI),
+		Contacts:               slices.Clone(c.Contacts),
+		BackchannelLogoutURI:   clonePtr(c.BackchannelLogoutURI),
+		RestrictGroupPrefix:    clonePtr(c.RestrictGroupPrefix),
+		Scim:                   c.Scim.clone(),
+		AllowedResources:       slices.Clone(c.AllowedResources),
+		DefaultAud:             slices.Clone(c.DefaultAud),
+		Claims:                 bytes.Clone(c.Claims),
+		ClaimsAtRoot:           c.ClaimsAtRoot,
+	}
+}
+
+func (s *ScimClientRequestResponse) clone() *ScimClientRequestResponse {
+	if s == nil {
+		return nil
+	}
+	out := *s
+	out.GroupSyncPrefix = clonePtr(s.GroupSyncPrefix)
+	return &out
+}
+
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
 }
 
 // ClientSecretRequest is the body of PUT /clients/{id}/secret. A nil

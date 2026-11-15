@@ -58,6 +58,10 @@ the access-group rights of the calls you make (here `Clients` and `Secrets`); a
 budget. A runnable version of the example is `ExampleNew` in
 `example_test.go`.
 
+`UpdateClient` is a full replace: a field the body leaves out is reset, so
+build the body with `GetClient(...).UpdateRequest()` and change only what the
+update is about.
+
 ### Validation
 
 `validation.go` carries the patterns, bounds and enums Rauthy checks on OIDC
