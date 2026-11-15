@@ -170,3 +170,49 @@ func TestUpdateScope_PutsToScopePath(t *testing.T) {
 		t.Errorf("got %s %s, want PUT with the id escaped", gotMethod, gotPath)
 	}
 }
+
+// PUT /scopes/{id} replaces the scope, so a read-modify-write has to carry
+// claims_at_root back or the update resets it to false.
+func TestScopeResponse_UpdateRequestKeepsEverySetting(t *testing.T) {
+	t.Parallel()
+
+	var got rauthy.ScopeResponse
+	if err := json.Unmarshal([]byte(`{"id":"scope-1","name":"read:billing",`+
+		`"attr_include_access":["department","cost_center"],"attr_include_id":["department"],`+
+		`"claims_at_root":true}`), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	req := got.UpdateRequest()
+	want := rauthy.ScopeRequest{
+		Scope:             "read:billing",
+		AttrIncludeAccess: []string{"department", "cost_center"},
+		AttrIncludeID:     []string{"department"},
+		ClaimsAtRoot:      true,
+	}
+	if !reflect.DeepEqual(req, want) {
+		t.Errorf("UpdateRequest() = %#v, want %#v", req, want)
+	}
+	req.AttrIncludeAccess[0] = "changed"
+	if got.AttrIncludeAccess[0] != "department" {
+		t.Error("UpdateRequest shares its slices with the response")
+	}
+
+	var gotBody map[string]any
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &gotBody)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"scope-1","name":"read:billing","claims_at_root":true}`))
+	})
+	out, err := c.UpdateScope(context.Background(), "scope-1", got.UpdateRequest())
+	if err != nil {
+		t.Fatalf("UpdateScope: %v", err)
+	}
+	if gotBody["claims_at_root"] != true {
+		t.Errorf("claims_at_root = %v, want true on the wire", gotBody["claims_at_root"])
+	}
+	if !out.ClaimsAtRoot {
+		t.Error("ClaimsAtRoot = false, want the response's true")
+	}
+}

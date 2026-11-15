@@ -55,7 +55,11 @@ if err != nil {
 the access-group rights of the calls you make (here `Clients` and `Secrets`); a
 403 is reported by `rauthy.IsForbidden` and usually names the missing right.
 `WithHTTPClient` sets the transport and timeout, `WithRetryPolicy` the retry
-budget. A runnable version of the example is `ExampleNew` in
+budget. A 429, a 5xx or a transport failure such as a reset is retried for
+GET, PUT and DELETE, and for a creating POST or a secret rotation only on a 429 or when
+nothing was sent; a request that timed out is never retried, because it may
+still be running on the server. With the defaults the pauses between attempts
+add up to at most 1.4 seconds. A runnable version of the example is `ExampleNew` in
 `example_test.go`.
 
 `UpdateClient` is a full replace: a field the body leaves out is reset, so

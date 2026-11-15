@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -66,6 +67,22 @@ type ScopeResponse struct {
 	Name              string   `json:"name"`
 	AttrIncludeAccess AttrList `json:"attr_include_access"`
 	AttrIncludeID     AttrList `json:"attr_include_id"`
+	// ClaimsAtRoot emits the mapped attributes at the token root instead of
+	// under `custom`.
+	ClaimsAtRoot bool `json:"claims_at_root"`
+}
+
+// UpdateRequest returns a PUT /scopes/{id} body that keeps every setting of s.
+// The PUT replaces the scope wholesale, so start from this and change only
+// what the update is about: a body assembled field by field resets whatever it
+// leaves out, claims_at_root included. The result shares no memory with s.
+func (s *ScopeResponse) UpdateRequest() ScopeRequest {
+	return ScopeRequest{
+		Scope:             s.Name,
+		AttrIncludeAccess: slices.Clone([]string(s.AttrIncludeAccess)),
+		AttrIncludeID:     slices.Clone([]string(s.AttrIncludeID)),
+		ClaimsAtRoot:      s.ClaimsAtRoot,
+	}
 }
 
 // ScopeRequest is the body of POST /scopes and PUT /scopes/{id}.
@@ -73,6 +90,7 @@ type ScopeRequest struct {
 	Scope             string   `json:"scope"`
 	AttrIncludeAccess []string `json:"attr_include_access,omitempty"`
 	AttrIncludeID     []string `json:"attr_include_id,omitempty"`
+	ClaimsAtRoot      bool     `json:"claims_at_root"`
 }
 
 func scopePath(id string) string {
@@ -127,7 +145,9 @@ func (c *Client) GetScopeByName(ctx context.Context, name string) (*ScopeRespons
 	return nil, notFoundError("/scopes", "no scope named "+name)
 }
 
-// UpdateScope issues PUT /scopes/{id}. Requires Scopes:Update.
+// UpdateScope issues PUT /scopes/{id}, replacing the scope wholesale: build req
+// with ScopeResponse.UpdateRequest from a GetScope result and change only what
+// the update is about. Requires Scopes:Update.
 func (c *Client) UpdateScope(ctx context.Context, id string, req ScopeRequest) (*ScopeResponse, error) {
 	var out ScopeResponse
 	if err := c.do(ctx, http.MethodPut, scopePath(id), req, &out); err != nil {

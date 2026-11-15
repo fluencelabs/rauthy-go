@@ -53,6 +53,12 @@ func newAPIError(method, path string, status int, raw []byte) *APIError {
 	return e
 }
 
+// ErrAmbiguousName is matched (errors.Is) by the error of a lookup by name that
+// found more than one object under that name. It is deliberately not a 404:
+// IsNotFound is false for it, so a caller that drops a resource it cannot find
+// does not mistake a duplicate for an absence.
+var ErrAmbiguousName = errors.New("name is ambiguous")
+
 // IsNotFound reports whether err is a 404 from the API.
 func IsNotFound(err error) bool { return hasStatus(err, http.StatusNotFound) }
 

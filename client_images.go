@@ -40,8 +40,13 @@ type Image struct {
 	ContentType string
 }
 
-func clientImagePath(id string, kind ImageKind) string {
-	return clientPath(id) + "/" + string(kind)
+// clientImagePath refuses a kind other than the two Rauthy defines: the kind
+// is the last path segment and is not escaped.
+func clientImagePath(id string, kind ImageKind) (string, error) {
+	if kind != ImageLogo && kind != ImageFavicon {
+		return "", fmt.Errorf("image kind %q: want %q or %q", kind, ImageLogo, ImageFavicon)
+	}
+	return clientPath(id) + "/" + string(kind), nil
 }
 
 // GetClientImage issues GET /clients/{id}/{logo,favicon}.
@@ -51,7 +56,10 @@ func clientImagePath(id string, kind ImageKind) string {
 // alone. Requires no special right beyond a valid key — the images are served
 // to the login page.
 func (c *Client) GetClientImage(ctx context.Context, id string, kind ImageKind) (*Image, error) {
-	path := clientImagePath(id, kind)
+	path, err := clientImagePath(id, kind)
+	if err != nil {
+		return nil, err
+	}
 	data, contentType, err := c.download(ctx, path)
 	if err != nil {
 		return nil, err
@@ -83,7 +91,10 @@ func (c *Client) GetClientImage(ctx context.Context, id string, kind ImageKind) 
 // which would put it out of reach of any API key; in practice a key with
 // Clients:Update uploads both images fine.
 func (c *Client) PutClientImage(ctx context.Context, id string, kind ImageKind, img Image) error {
-	path := clientImagePath(id, kind)
+	path, err := clientImagePath(id, kind)
+	if err != nil {
+		return err
+	}
 	body, contentType, err := multipartBody(string(kind), img)
 	if err != nil {
 		return fmt.Errorf("build %s %s body: %w", http.MethodPut, path, err)
@@ -95,7 +106,11 @@ func (c *Client) PutClientImage(ctx context.Context, id string, kind ImageKind, 
 // idempotent: deleting an image that is not there still answers 200. Requires
 // Clients:Update.
 func (c *Client) DeleteClientImage(ctx context.Context, id string, kind ImageKind) error {
-	return c.do(ctx, http.MethodDelete, clientImagePath(id, kind), nil, nil)
+	path, err := clientImagePath(id, kind)
+	if err != nil {
+		return err
+	}
+	return c.do(ctx, http.MethodDelete, path, nil, nil)
 }
 
 // SniffImageMime maps the leading bytes of an image to the content type Rauthy

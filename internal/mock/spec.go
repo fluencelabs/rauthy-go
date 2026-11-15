@@ -14,11 +14,6 @@ import (
 	validator "github.com/pb33f/libopenapi-validator"
 )
 
-// ErrNoSpec is returned when no vendored spec is present in testdata. The spec
-// is produced by `make openapi-refresh`, which needs Docker and is run by hand;
-// see scripts/openapi-refresh.sh.
-var ErrNoSpec = errors.New("no vendored Rauthy OpenAPI spec in internal/mock/testdata")
-
 // SpecPath returns the path of the vendored spec. The filename carries the
 // Rauthy version it was generated from (rauthy-openapi-<version>.json) so that
 // a spec left behind by a version bump is visible rather than silently stale.
@@ -34,7 +29,9 @@ func SpecPath() (string, error) {
 		return "", err
 	}
 	if len(matches) == 0 {
-		return "", ErrNoSpec
+		// The spec is committed, so its absence is a broken checkout or a
+		// build that moved this file (-trimpath), never a state to skip on.
+		return "", fmt.Errorf("no vendored Rauthy OpenAPI spec (rauthy-openapi-*.json) in %s", dir)
 	}
 	if len(matches) > 1 {
 		sort.Strings(matches)
@@ -48,26 +45,28 @@ func SpecPath() (string, error) {
 
 // NewValidator builds a request/response validator from the vendored spec. This
 // is the authoritative contract: drift between what the client sends and what
-// Rauthy accepts shows up here without a live instance.
-func NewValidator() (validator.Validator, []error, error) {
+// Rauthy accepts shows up here without a live instance. Any error building the
+// model fails the build: the pinned libopenapi-validator returns no validator
+// alongside one.
+func NewValidator() (validator.Validator, error) {
 	path, err := SpecPath()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("read %s: %w", path, err)
+		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
 	doc, err := libopenapi.NewDocument(raw)
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
+		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 
 	v, errs := validator.NewValidator(doc)
-	if v == nil {
-		return nil, errs, fmt.Errorf("build validator from %s: %v", path, errs)
+	if v == nil || len(errs) > 0 {
+		return nil, fmt.Errorf("build validator from %s: %w", path, errors.Join(errs...))
 	}
-	return v, errs, nil
+	return v, nil
 }

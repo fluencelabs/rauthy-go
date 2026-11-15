@@ -376,6 +376,9 @@ func TestRetry_StopsOnCancelledContext(t *testing.T) {
 	go func() {
 		for calls.Load() == 0 { //nolint:revive // spin until the first attempt has landed
 		}
+		// Let the 503 reach the client, so the cancellation lands in the
+		// backoff rather than on the first exchange.
+		time.Sleep(100 * time.Millisecond)
 		cancel()
 	}()
 
@@ -384,13 +387,194 @@ func TestRetry_StopsOnCancelledContext(t *testing.T) {
 
 	select {
 	case getErr := <-done:
-		if getErr == nil {
-			t.Fatal("GetUser: want error")
+		if !errors.Is(getErr, context.Canceled) {
+			t.Errorf("err = %v, want it to carry context.Canceled", getErr)
+		}
+		apiErr, ok := errors.AsType[*rauthy.APIError](getErr)
+		if !ok || apiErr.StatusCode != http.StatusServiceUnavailable {
+			t.Errorf("err = %v, want it to keep the 503 that caused the retry", getErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("GetUser did not return: the backoff ignored the cancelled context")
 	}
 	if got := calls.Load(); got != 1 {
 		t.Errorf("requests = %d, want 1", got)
+	}
+}
+
+// Rotating a secret is not a replacement: re-sending a rotation that did
+// commit mints a second secret and pushes the one the caller will see out of
+// the grace window. Once the request may have reached the server it is not
+// repeated.
+func TestRetry_SecretRotationIsNotRetried(t *testing.T) {
+	t.Parallel()
+
+	rotations := map[string]func(*rauthy.Client) error{
+		"client secret": func(c *rauthy.Client) error {
+			_, err := c.RotateClientSecret(t.Context(), "app", nil)
+			return err
+		},
+		"api key secret": func(c *rauthy.Client) error {
+			_, err := c.RotateAPIKeySecret(t.Context(), "deploy")
+			return err
+		},
+	}
+	for name, rotate := range rotations {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			c, calls := newRetryClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusBadGateway)
+			})
+			if err := rotate(c); err == nil {
+				t.Fatal("rotation: want error")
+			}
+			if got := calls.Load(); got != 1 {
+				t.Errorf("requests = %d, want 1: a 502 may sit on top of a rotation that committed", got)
+			}
+		})
+	}
+}
+
+// A 429 was refused before the handler ran, so a rotation may be re-sent.
+func TestRetry_SecretRotationIsRetriedOnTooManyRequests(t *testing.T) {
+	t.Parallel()
+
+	var seen atomic.Int32
+	c, calls := newRetryClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		if seen.Add(1) == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_, _ = io.WriteString(w, `{"id":"app","confidential":true,"secret":"new"}`)
+	})
+
+	if _, err := c.RotateClientSecret(t.Context(), "app", nil); err != nil {
+		t.Fatalf("RotateClientSecret: %v", err)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Errorf("requests = %d, want 2", got)
+	}
+}
+
+// slowFirstServer holds its first request past the client's timeout and
+// answers the rest at once, so a retry would succeed.
+func slowFirstServer(t *testing.T, hold time.Duration, body string) (string, *atomic.Int32) {
+	t.Helper()
+
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) == 1 {
+			select {
+			case <-r.Context().Done():
+			case <-time.After(hold):
+			}
+			return
+		}
+		_, _ = io.WriteString(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL, &calls
+}
+
+// An attempt cut off by the http.Client timeout may still be running on the
+// server, so it is not re-sent, whatever the method.
+func TestRetry_HTTPClientTimeoutIsNotRetried(t *testing.T) {
+	t.Parallel()
+
+	calls := map[string]func(*rauthy.Client) error{
+		"GET": func(c *rauthy.Client) error {
+			_, err := c.GetUser(t.Context(), "u1")
+			return err
+		},
+		"PUT": func(c *rauthy.Client) error {
+			return c.UpdateUserAttr(t.Context(), "dept", rauthy.UserAttrRequest{Name: "dept"})
+		},
+		"DELETE": func(c *rauthy.Client) error {
+			return c.DeleteUser(t.Context(), "u1")
+		},
+		"POST": func(c *rauthy.Client) error {
+			_, err := c.CreateUser(t.Context(), rauthy.NewUserRequest{Email: "a@example.com"})
+			return err
+		},
+	}
+	for method, call := range calls {
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+
+			url, served := slowFirstServer(t, 5*time.Second, `{"id":"u1","email":"a@example.com"}`)
+			c, err := rauthy.New(url, "tf$secret", retryTestPolicy(),
+				rauthy.WithHTTPClient(&http.Client{Timeout: 100 * time.Millisecond}))
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if err = call(c); !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("err = %v, want the client timeout", err)
+			}
+			if got := served.Load(); got != 1 {
+				t.Errorf("requests = %d, want 1", got)
+			}
+		})
+	}
+}
+
+// A deadline on the caller's own context ends the call without a retry.
+func TestRetry_CallerDeadlineIsNotRetried(t *testing.T) {
+	t.Parallel()
+
+	url, calls := slowFirstServer(t, 5*time.Second, `{"id":"u1","email":"a@example.com"}`)
+	c, err := rauthy.New(url, "tf$secret", retryTestPolicy())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	if _, err = c.GetUser(ctx, "u1"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("GetUser: err = %v, want context.DeadlineExceeded", err)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Errorf("requests = %d, want 1", got)
+	}
+}
+
+func TestWithRetryPolicy_RejectsNegativeValues(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]rauthy.Option{
+		"attempts":   rauthy.WithRetryPolicy(-1, time.Millisecond, time.Second),
+		"base delay": rauthy.WithRetryPolicy(4, -time.Millisecond, time.Second),
+		"max delay":  rauthy.WithRetryPolicy(4, time.Millisecond, -time.Second),
+	}
+	for name, opt := range cases {
+		if _, err := rauthy.New("https://auth.example.com", "tf$secret", opt); err == nil {
+			t.Errorf("negative %s: New succeeded, want error", name)
+		}
+	}
+}
+
+// A zero base delay asks for retries without a pause, not for the longest
+// pause the cap allows.
+func TestWithRetryPolicy_ZeroBaseDelayMeansNoDelay(t *testing.T) {
+	t.Parallel()
+
+	var seen atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if seen.Add(1) <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = io.WriteString(w, `{"id":"u1","email":"a@example.com"}`)
+	}))
+	t.Cleanup(srv.Close)
+
+	c, err := rauthy.New(srv.URL, "tf$secret", rauthy.WithRetryPolicy(4, 0, time.Hour))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if _, err = c.GetUser(ctx, "u1"); err != nil {
+		t.Fatalf("GetUser: %v", err)
 	}
 }

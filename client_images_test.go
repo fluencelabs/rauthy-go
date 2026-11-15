@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/fluencelabs/rauthy-go"
@@ -170,5 +171,61 @@ func TestGetClientImageReturnsRawBytes(t *testing.T) {
 	_, missingErr := c.GetClientImage(context.Background(), "app", rauthy.ImageLogo)
 	if !rauthy.IsNotFound(missingErr) {
 		t.Fatalf("missing logo: got %v, want a not-found error", missingErr)
+	}
+}
+
+// The kind is the last path segment, so only the kinds Rauthy defines may go
+// there.
+func TestClientImage_RejectsUnknownKind(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	img := rauthy.Image{Data: []byte("<svg/>"), ContentType: rauthy.MimeSVG}
+	for _, kind := range []rauthy.ImageKind{"", "../../users/u1", "banner", "logo?x"} {
+		if _, err := c.GetClientImage(t.Context(), "cl1", kind); err == nil {
+			t.Errorf("GetClientImage(%q) succeeded, want error", kind)
+		}
+		if err := c.PutClientImage(t.Context(), "cl1", kind, img); err == nil {
+			t.Errorf("PutClientImage(%q) succeeded, want error", kind)
+		}
+		if err := c.DeleteClientImage(t.Context(), "cl1", kind); err == nil {
+			t.Errorf("DeleteClientImage(%q) succeeded, want error", kind)
+		}
+	}
+	if got := calls.Load(); got != 0 {
+		t.Errorf("server received %d request(s), want none", got)
+	}
+}
+
+// The content type is written into the multipart part header as given, so a
+// CR or LF in it would inject headers into the part.
+func TestPutClientImage_RejectsBadContentType(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	for _, ct := range []string{
+		"image/png\r\nX-Injected: 1",
+		"image/png\nX-Injected: 1",
+		"image/png\r",
+		"not a media type",
+		"",
+	} {
+		img := rauthy.Image{Data: []byte("\x89PNG\r\n\x1a\n"), ContentType: ct}
+		if err := c.PutClientImage(t.Context(), "cl1", rauthy.ImageLogo, img); err == nil {
+			t.Errorf("PutClientImage with content type %q succeeded, want error", ct)
+		}
+	}
+	if got := calls.Load(); got != 0 {
+		t.Errorf("server received %d request(s), want none", got)
 	}
 }

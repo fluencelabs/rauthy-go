@@ -2,6 +2,7 @@ package rauthy
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 )
@@ -156,7 +157,8 @@ func (c *Client) GetAuthProvider(ctx context.Context, id string) (*AuthProviderR
 // GetAuthProviderByName returns the single provider with the given name.
 //
 // Rauthy does not require provider names to be unique, so an ambiguous name is
-// an error rather than an arbitrary pick.
+// an error rather than an arbitrary pick. That error matches ErrAmbiguousName
+// and is not a 404.
 func (c *Client) GetAuthProviderByName(ctx context.Context, name string) (*AuthProviderResponse, error) {
 	providers, err := c.ListAuthProviders(ctx)
 	if err != nil {
@@ -168,8 +170,8 @@ func (c *Client) GetAuthProviderByName(ctx context.Context, name string) (*AuthP
 			continue
 		}
 		if found != nil {
-			return nil, notFoundError("/providers",
-				"more than one auth provider is named "+name+"; look it up by id instead")
+			return nil, fmt.Errorf("more than one auth provider is named %s; look it up by id instead: %w",
+				name, ErrAmbiguousName)
 		}
 		found = &providers[i]
 	}

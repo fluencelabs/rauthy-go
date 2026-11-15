@@ -3,10 +3,12 @@ package rauthy_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/fluencelabs/rauthy-go"
@@ -246,5 +248,148 @@ func TestIDIsPathEscaped(t *testing.T) {
 	}
 	if want := "/auth/v1/clients/a%23b%3Fc%25d"; gotPath != want {
 		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+}
+
+// The admin API never redirects. Following one would re-send the API key, and
+// on a 307 or 308 the request body, to wherever the Location points, so the
+// default client stops at the 3xx and reports it.
+func TestNew_DoesNotFollowRedirects(t *testing.T) {
+	t.Parallel()
+
+	var elsewhere atomic.Int32
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		elsewhere.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(other.Close)
+
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL+r.URL.Path, http.StatusTemporaryRedirect)
+	})
+
+	_, err := c.UpdateRole(t.Context(), "r1", rauthy.RoleRequest{Role: "admin"})
+	apiErr, ok := errors.AsType[*rauthy.APIError](err)
+	if !ok || apiErr.StatusCode != http.StatusTemporaryRedirect {
+		t.Errorf("err = %v, want an APIError carrying the 307", err)
+	}
+	if got := elsewhere.Load(); got != 0 {
+		t.Errorf("redirect target received %d request(s), want none", got)
+	}
+}
+
+// A refused redirect names where the server tried to send the call, as
+// scheme, host and path only: userinfo and the query may carry credentials.
+func TestRefusedRedirect_NamesTheLocation(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		location string
+		want     string
+		relative bool
+	}{
+		"absolute": {
+			location: "https://admin:hunter2@login.example.com/sso/start?token=abc#frag",
+			want:     "https://login.example.com/sso/start",
+		},
+		"relative":    {location: "/moved/here?token=abc", want: "/moved/here", relative: true},
+		"missing":     {location: "", want: "no Location"},
+		"unparseable": {location: "http://[::1", want: "does not parse"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var srvURL string
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				srvURL = "http://" + r.Host
+				if tc.location != "" {
+					w.Header().Set("Location", tc.location)
+				}
+				w.WriteHeader(http.StatusFound)
+				_, _ = io.WriteString(w, `<a href="`+tc.location+`">Found</a>`)
+			})
+
+			_, err := c.GetUser(t.Context(), "u1")
+			want := tc.want
+			if tc.relative {
+				want = srvURL + want
+			}
+			checkRedirectError(t, err, want)
+		})
+	}
+}
+
+func checkRedirectError(t *testing.T, err error, want string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatal("want error")
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("err = %q, want it to contain %q", err, want)
+	}
+	for _, secret := range []string{"hunter2", "token=abc", "frag"} {
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("err = %q leaks %q", err, secret)
+		}
+	}
+}
+
+// A caller-supplied client keeps its own redirect policy: New must not
+// rewrite it behind the caller's back.
+func TestWithHTTPClient_LeavesTheCallersClientAlone(t *testing.T) {
+	t.Parallel()
+
+	hc := &http.Client{}
+	if _, err := rauthy.New("https://auth.example.com", "tf$secret", rauthy.WithHTTPClient(hc)); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if hc.CheckRedirect != nil {
+		t.Error("New set CheckRedirect on the caller's client")
+	}
+}
+
+func TestNew_RejectsNilHTTPClient(t *testing.T) {
+	t.Parallel()
+
+	if _, err := rauthy.New("https://auth.example.com", "tf$secret", rauthy.WithHTTPClient(nil)); err == nil {
+		t.Error("New with a nil http.Client succeeded, want error")
+	}
+}
+
+// A query or fragment would land in front of /auth/v1 and every request path.
+func TestNew_RejectsQueryAndFragment(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		"https://auth.example.com/?tenant=a",
+		"https://auth.example.com?",
+		"https://auth.example.com/#top",
+	} {
+		if _, err := rauthy.New(raw, "tf$secret"); err == nil {
+			t.Errorf("New(%q) succeeded, want error", raw)
+		}
+	}
+}
+
+// A URL carrying userinfo must not have its password echoed into an error,
+// which ends up in logs and Terraform diagnostics.
+func TestNew_ErrorsDoNotEchoTheURLPassword(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		"ftp://admin:hunter2@auth.example.com",
+		"https://admin:hunter2@auth.example.com/?x=1",
+		"https://admin:hunter2@auth.example.com/%zz",
+	} {
+		_, err := rauthy.New(raw, "tf$secret")
+		if err == nil {
+			t.Errorf("New(%q) succeeded, want error", raw)
+			continue
+		}
+		if strings.Contains(err.Error(), "hunter2") {
+			t.Errorf("New(%q) error %q leaks the password", raw, err)
+		}
 	}
 }

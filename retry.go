@@ -10,13 +10,18 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
-// Retry defaults. Four attempts with a 200ms base spend under two seconds in
-// the worst case, which is short enough that a caller (a `terraform apply`, say)
-// does not look hung and long enough to ride out a reverse proxy reloading or a Rauthy pod
-// being rescheduled.
+// Retry defaults. Four attempts with a 200ms base pause for at most 1.4 seconds
+// in all between attempts (backoff windows of 200ms, 400ms and 800ms), which is
+// short enough that a caller (a `terraform apply`, say) does not look hung and
+// long enough to ride out a reverse proxy reloading or a Rauthy pod being
+// rescheduled. That bound covers the pauses only: each attempt also lasts as
+// long as the server takes to answer, up to the http.Client timeout (30 seconds
+// by default), and a Retry-After header can stretch a pause to
+// maxHonouredRetryAfter.
 const (
 	defaultMaxAttempts = 4
 	defaultBaseDelay   = 200 * time.Millisecond
@@ -41,6 +46,9 @@ type rawResponse struct {
 	contentType string
 	status      int
 	retryAfter  string
+	// redirect replaces the body as the error message of a refused 3xx; it is
+	// empty for any other status.
+	redirect string
 }
 
 // buildError marks a request that could not be constructed at all, as opposed
@@ -74,7 +82,11 @@ func (c *Client) send(
 			return resp, nil
 		default:
 			status, retryAfter = resp.status, resp.retryAfter
-			lastErr = newAPIError(method, path, resp.status, resp.body)
+			apiErr := newAPIError(method, path, resp.status, resp.body)
+			if resp.redirect != "" {
+				apiErr.Message = resp.redirect
+			}
+			lastErr = apiErr
 		}
 
 		if attempt >= c.retry.maxAttempts || !c.retryable(method, path, status, err) {
@@ -85,9 +97,10 @@ func (c *Client) send(
 			return nil, lastErr
 		}
 		if waitErr := sleep(ctx, delay); waitErr != nil {
-			// The context died mid-backoff. Report why the request failed
-			// rather than the cancellation, so the operator sees the cause.
-			return nil, lastErr
+			// The context died mid-backoff. Report both why the request failed,
+			// so the operator sees the cause, and the cancellation, so a caller
+			// can tell that it gave up.
+			return nil, fmt.Errorf("%w (gave up waiting to retry: %w)", lastErr, waitErr)
 		}
 	}
 }
@@ -113,6 +126,9 @@ func (c *Client) attempt(
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		if isUnparseableLocation(err) {
+			return nil, &redirectError{method: method, path: path}
+		}
 		return nil, fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -128,6 +144,7 @@ func (c *Client) attempt(
 		contentType: resp.Header.Get("Content-Type"),
 		status:      resp.StatusCode,
 		retryAfter:  resp.Header.Get("Retry-After"),
+		redirect:    redirectMessage(resp.StatusCode, req.URL, resp.Header.Get("Location")),
 	}, nil
 }
 
@@ -139,9 +156,17 @@ func (c *Client) attempt(
 // re-run, while retrying a create that actually succeeded leaves a duplicate
 // user behind that the caller does not know about.
 //
+// What is retried at all: a 429, a 5xx, and a transport failure — a refused
+// dial, a reset, an EOF. Never retried, whatever the method: any other 4xx, a
+// 3xx, and an attempt that ended because a deadline passed, be it the
+// http.Client timeout or the caller's context. A request that timed out may
+// still be running on the server, and re-sending it would overlap it there;
+// with a 30 second timeout it would also turn a hung server into minutes of
+// waiting.
+//
 // GET, PUT and DELETE are idempotent across this API — Rauthy's PUTs are full
 // replacements and its DELETEs answer the same way for an object that is
-// already gone — so they retry on anything transient.
+// already gone — so they retry on every failure in the first list.
 //
 // POST is not, in general, and gets two narrow exemptions:
 //
@@ -155,13 +180,23 @@ func (c *Client) attempt(
 // The one POST endpoint that is an upsert by design — POST /blacklist, see
 // BlacklistIP — opts out of that caution by path, since re-posting it only
 // rewrites an expiry it was already going to write.
+//
+// The PUTs that rotate a secret — /clients/{id}/secret and
+// /api_keys/{name}/secret — are the exception the other way: each one mints a
+// new secret, so re-sending one that committed rotates twice. They get the
+// POST rule.
 func (c *Client) retryable(method, path string, status int, err error) bool {
 	if !retryableFailure(status, err) {
 		return false
 	}
 	switch method {
-	case http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete:
+	case http.MethodGet, http.MethodHead, http.MethodDelete:
 		return true
+	case http.MethodPut:
+		if !strings.HasSuffix(path, secretRotationSuffix) {
+			return true
+		}
+		return status == http.StatusTooManyRequests || (err != nil && sentNothing(err))
 	case http.MethodPost:
 		if path == blacklistPathBase || status == http.StatusTooManyRequests {
 			return true
@@ -171,6 +206,10 @@ func (c *Client) retryable(method, path string, status int, err error) bool {
 		return false
 	}
 }
+
+// secretRotationSuffix ends the path of every PUT that rotates a secret. An
+// identifier cannot forge it: url.PathEscape turns a "/" inside one into %2F.
+const secretRotationSuffix = "/secret"
 
 // delayFor returns how long to wait before the next attempt, and whether to
 // wait at all. A Retry-After from the server wins over our own backoff: it is
@@ -195,14 +234,37 @@ func (c *Client) delayFor(attempt int, retryAfter string) (time.Duration, bool) 
 // jitter down to zero would let a fleet of parallel applies retry almost
 // immediately and re-collide; keeping the floor at half the window spreads them
 // out without throwing the backoff away.
+//
+// A zero base delay means no delay at all. The window is clamped to maxDelay
+// before the shift, not after it: a shift that pushed bits out of the int64
+// could otherwise leave a small positive window below the cap.
 func (p retryPolicy) backoff(attempt int) time.Duration {
-	window := p.baseDelay << (attempt - 1)
-	if window > p.maxDelay || window <= 0 {
-		window = p.maxDelay
+	if p.baseDelay <= 0 || p.maxDelay <= 0 {
+		return 0
+	}
+	window := p.maxDelay
+	if shift := attempt - 1; shift < maxBackoffShift && p.baseDelay <= p.maxDelay>>shift {
+		window = p.baseDelay << shift
 	}
 	const jitterFloor = 2 // half the window, the lowest a jittered delay may fall to
 	floor := window / jitterFloor
 	return floor + time.Duration(rand.Int64N(int64(floor)+1)) //nolint:gosec // scheduling jitter, not a secret
+}
+
+// maxBackoffShift is the widest shift of a positive int64 that can still be
+// compared against the cap.
+const maxBackoffShift = 63
+
+// validate refuses a negative attempt budget or delay, neither of which has a
+// meaning.
+func (p retryPolicy) validate() error {
+	if p.maxAttempts < 0 || p.baseDelay < 0 || p.maxDelay < 0 {
+		return fmt.Errorf(
+			"rauthy retry policy must not be negative: %d attempts, %v base delay, %v max delay",
+			p.maxAttempts, p.baseDelay, p.maxDelay,
+		)
+	}
+	return nil
 }
 
 // retryableFailure reports whether a failure is transient at all, before any
@@ -216,10 +278,16 @@ func retryableFailure(status int, err error) bool {
 	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
 }
 
-// isTransport separates a failed exchange from the failures that are ours: a
-// request we could not build, or a context the caller ended.
+// isTransport separates a failed exchange from the failures that are ours or
+// that a retry cannot fix: a request we could not build, a redirect we refused,
+// and an attempt that ran out of time. The last covers both a context the
+// caller ended and an http.Client timeout, which net/http also reports as
+// context.DeadlineExceeded; neither is retried (see retryable for why).
 func isTransport(err error) bool {
 	if _, ok := errors.AsType[*buildError](err); ok {
+		return false
+	}
+	if _, ok := errors.AsType[*redirectError](err); ok {
 		return false
 	}
 	return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
