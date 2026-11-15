@@ -3,6 +3,7 @@ package rauthy_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -129,6 +130,14 @@ func TestGetAuthProviderByName_AmbiguousNameIsRefused(t *testing.T) {
 	_, err := c.GetAuthProviderByName(context.Background(), "Example IdP")
 	if err == nil || !strings.Contains(err.Error(), "more than one") {
 		t.Errorf("err = %v, want a complaint about the duplicate name", err)
+	}
+	// A caller that drops a resource on IsNotFound must not take a duplicate
+	// for an absence.
+	if rauthy.IsNotFound(err) {
+		t.Errorf("IsNotFound(%v) = true, want an ambiguous name to be told apart from a missing one", err)
+	}
+	if !errors.Is(err, rauthy.ErrAmbiguousName) {
+		t.Errorf("err = %v, want it to match ErrAmbiguousName", err)
 	}
 }
 
