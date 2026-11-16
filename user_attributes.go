@@ -1,6 +1,7 @@
 package rauthy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -13,10 +14,11 @@ import (
 // as raw bytes rather than being forced into a Go type: Rauthy stores whatever
 // it is handed and gives it back unchanged.
 //
-// `typ` is deliberately absent. Rauthy's own OpenAPI document describes it as
-// "Currently ignored - will be implemented in a future version", and its only
-// enum member is `Email`, so sending it would be a no-op field that callers
-// would then have to keep supplying forever for compatibility.
+// `typ` is deliberately not sent. Against a live Rauthy 0.36.2 an attribute
+// written with a typ cannot be managed afterwards: one created with
+// "typ":"Email" answers PUT and DELETE /users/attr/{name} with 404 "no rows
+// returned", whatever the body, and an untyped one PUT with a typ answers 200
+// and then drops out of GET /users/attr. UserAttrResponse.Typ reports it.
 type UserAttrRequest struct {
 	Name         string          `json:"name"`
 	Desc         *string         `json:"desc,omitempty"`
@@ -30,7 +32,27 @@ type UserAttrResponse struct {
 	Name         string          `json:"name"`
 	Desc         *string         `json:"desc,omitempty"`
 	DefaultValue json.RawMessage `json:"default_value,omitempty"`
-	UserEditable bool            `json:"user_editable"`
+	// Typ is the attribute's value type ("Email" is the only one Rauthy 0.36.2
+	// knows), read-only here: see UserAttrRequest for why it is never sent.
+	Typ          *string `json:"typ,omitempty"`
+	UserEditable bool    `json:"user_editable"`
+}
+
+// UpdateRequest returns a PUT /users/attr/{name} body that keeps the
+// description, default value and user_editable of a. The PUT replaces the
+// attribute wholesale, so start from this and change only what the update is
+// about: a body assembled field by field resets whatever it leaves out. Typ is
+// not carried (see UserAttrRequest), and an attribute that has one cannot be
+// updated on 0.36.2 at all. Keep the name: UpdateUserAttr explains why a PUT
+// must not rename. The result shares no memory with a.
+func (a *UserAttrResponse) UpdateRequest() UserAttrRequest {
+	editable := a.UserEditable
+	return UserAttrRequest{
+		Name:         a.Name,
+		Desc:         clonePtr(a.Desc),
+		DefaultValue: bytes.Clone(a.DefaultValue),
+		UserEditable: &editable,
+	}
 }
 
 // userAttrListResponse wraps the list. GET /users/attr does not answer with a

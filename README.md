@@ -70,7 +70,14 @@ does not parse is an error, not a guess.
 
 `UpdateClient` is a full replace: a field the body leaves out is reset, so
 build the body with `GetClient(...).UpdateRequest()` and change only what the
-update is about.
+update is about. Scopes, roles, groups and user attributes work the same way,
+each response type carrying an `UpdateRequest()`.
+
+`RoleRequest`, `RoleResponse`, `GroupRequest` and `GroupResponse` carry `Meta`,
+a `json.RawMessage`, since the release after v0.1.0. That is a source
+incompatibility for some callers: the four structs are no longer comparable
+with `==` and cannot be map keys, and a positional (unkeyed) literal of them
+no longer compiles. Keyed literals are unaffected.
 
 ### Validation
 
@@ -102,7 +109,7 @@ The OpenAPI document cannot express value ranges, so the contract tests check
 field sets and types, not the constraints in `validation.go`.
 `TestSchemaCoverage` compares the field sets of the wire types it lists with
 the spec's schemas; the types that still miss spec properties are recorded in
-its `knownGaps` table, property by property, and are not fixed yet.
+its `knownGaps` table, property by property, with the reason each is left out.
 
 ## Refreshing the spec
 

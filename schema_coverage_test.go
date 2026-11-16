@@ -163,6 +163,13 @@ func coveredTypes() []coveredType {
 			liveShape: []string{"ips"},
 		},
 		{value: rauthy.PamHostSecretResponse{}, schema: "PamHostSecretResponse"},
+		{value: rauthy.RoleRequest{}, schema: "RoleRequest", request: true},
+		{value: rauthy.RoleResponse{}, schema: "RoleResponse"},
+		{value: rauthy.GroupRequest{}, schema: "GroupRequest", request: true},
+		{value: rauthy.GroupResponse{}, schema: "GroupResponse"},
+		{value: rauthy.UserAttrResponse{}, schema: "UserAttrConfigValueResponse"},
+		{value: rauthy.NewUserRequest{}, schema: "NewUserRequest", request: true},
+		{value: rauthy.UserResponse{}, schema: "UserResponse"},
 		{value: rauthy.VersionResponse{}, schema: "AppVersionResponse"},
 	}
 }
@@ -172,28 +179,21 @@ func coveredTypes() []coveredType {
 // test, and so does a closed one until its entry is removed. Request types in
 // this list lose the missing values on every read-modify-write.
 func knownGaps() []coveredType {
-	roleMeta := []string{"meta"}
+	// Left out on purpose rather than pending: an SSH key is added by the user
+	// through /pam/users/self/authorized_keys, never by an admin, so it is
+	// runtime state the admin surface does not manage (see pam.go). Both types
+	// are responses, so nothing written back loses the keys.
+	authorizedKeys := []string{"authorized_keys"}
 	return []coveredType{
-		{value: rauthy.RoleRequest{}, schema: "RoleRequest", request: true, missing: roleMeta},
-		{value: rauthy.RoleResponse{}, schema: "RoleResponse", missing: roleMeta},
-		{value: rauthy.GroupRequest{}, schema: "GroupRequest", request: true, missing: roleMeta},
-		{value: rauthy.GroupResponse{}, schema: "GroupResponse", missing: roleMeta},
+		// Left out on purpose: against a live Rauthy 0.36.2, an attribute
+		// created with a typ answers PUT and DELETE /users/attr/{name} with 404
+		// "no rows returned", with or without typ in the body, and an untyped
+		// attribute PUT with a typ answers 200 and then drops out of
+		// GET /users/attr. Sending typ makes attributes that cannot be managed.
+		// UserAttrResponse still reads it.
 		{value: rauthy.UserAttrRequest{}, schema: "UserAttrConfigRequest", request: true, missing: []string{"typ"}},
-		{value: rauthy.UserAttrResponse{}, schema: "UserAttrConfigValueResponse", missing: []string{"typ"}},
-		{
-			value: rauthy.NewUserRequest{}, schema: "NewUserRequest", request: true,
-			missing: []string{"preferred_username"},
-		},
-		// Read-only fields: nothing is written back, they are only not readable.
-		{value: rauthy.UserResponse{}, schema: "UserResponse", missing: []string{
-			"auth_provider_id", "failed_login_attempts", "federation_uid", "last_failed_login",
-			"password_expires", "picture_id", "webauthn_user_id",
-		}},
-		{value: rauthy.PamUserResponse{}, schema: "PamUserResponse", missing: []string{"authorized_keys"}},
-		{
-			value: rauthy.PamUserDetailsResponse{}, schema: "PamUserDetailsResponse",
-			missing: []string{"authorized_keys"},
-		},
+		{value: rauthy.PamUserResponse{}, schema: "PamUserResponse", missing: authorizedKeys},
+		{value: rauthy.PamUserDetailsResponse{}, schema: "PamUserDetailsResponse", missing: authorizedKeys},
 	}
 }
 
