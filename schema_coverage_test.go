@@ -170,6 +170,7 @@ func coveredTypes() []coveredType {
 		{value: rauthy.UserAttrResponse{}, schema: "UserAttrConfigValueResponse"},
 		{value: rauthy.NewUserRequest{}, schema: "NewUserRequest", request: true},
 		{value: rauthy.UserResponse{}, schema: "UserResponse"},
+		{value: rauthy.VersionResponse{}, schema: "AppVersionResponse"},
 	}
 }
 

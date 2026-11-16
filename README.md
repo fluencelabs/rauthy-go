@@ -62,6 +62,12 @@ still be running on the server. With the defaults the pauses between attempts
 add up to at most 1.4 seconds. A runnable version of the example is `ExampleNew` in
 `example_test.go`.
 
+`GetVersion` reads the Rauthy release the server runs (`GET /version`, which
+needs no access right, so it is sent without the API key), and
+`VersionResponse.AtLeast(major, minor)` answers whether that release is at
+least `major.minor`, by semantic versioning precedence. A version string that
+does not parse is an error, not a guess.
+
 `UpdateClient` is a full replace: a field the body leaves out is reset, so
 build the body with `GetClient(...).UpdateRequest()` and change only what the
 update is about. Scopes, roles, groups and user attributes work the same way,
