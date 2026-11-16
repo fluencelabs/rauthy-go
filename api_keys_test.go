@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/fluencelabs/rauthy-go"
@@ -147,10 +148,21 @@ func TestGetAPIKey_SyntheticNotFound(t *testing.T) {
 		_, _ = w.Write([]byte(twoAPIKeysJSON))
 	})
 
-	if _, err := c.GetAPIKey(context.Background(), "deploy"); err != nil {
+	got, err := c.GetAPIKey(context.Background(), "deploy")
+	if err != nil {
 		t.Fatalf("GetAPIKey: %v", err)
 	}
-	_, err := c.GetAPIKey(context.Background(), "absent")
+	if got.Name != "deploy" || got.Expires == nil || *got.Expires != 1900000000 {
+		t.Errorf("key = %+v", got)
+	}
+	wantAccess := []rauthy.APIKeyAccess{
+		{Group: "Users", AccessRights: []string{"read"}},
+		{Group: "ApiKeys", AccessRights: []string{}},
+	}
+	if !reflect.DeepEqual(got.Access, wantAccess) {
+		t.Errorf("access = %+v, want %+v", got.Access, wantAccess)
+	}
+	_, err = c.GetAPIKey(context.Background(), "absent")
 	if !rauthy.IsNotFound(err) {
 		t.Errorf("want a 404, got %v", err)
 	}

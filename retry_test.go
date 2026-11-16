@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -126,8 +127,7 @@ func TestRetry_ClientErrorsAreNotRetried(t *testing.T) {
 }
 
 // A Retry-After the client can afford is waited out and the call proceeds; one
-// far beyond the honoured ceiling ends the call there and then, which is the
-// only externally visible proof that the header was read at all.
+// far beyond the honoured ceiling ends the call without another attempt.
 func TestRetry_HonoursRetryAfter(t *testing.T) {
 	t.Parallel()
 
@@ -135,17 +135,28 @@ func TestRetry_HonoursRetryAfter(t *testing.T) {
 		t.Parallel()
 
 		var seen atomic.Int32
+		first := make(chan time.Time, 1)
 		c, calls := newRetryClient(t, func(w http.ResponseWriter, _ *http.Request) {
 			if seen.Add(1) == 1 {
-				w.Header().Set("Retry-After", "0")
+				first <- time.Now()
+				w.Header().Set("Retry-After", "1")
 				w.WriteHeader(http.StatusTooManyRequests)
 				return
+			}
+			started := <-first
+			first <- started
+			if elapsed := time.Since(started); elapsed < time.Second {
+				t.Errorf("retry after %v, want at least 1s", elapsed)
 			}
 			_, _ = io.WriteString(w, `{"id":"u1"}`)
 		})
 
-		if _, err := c.GetUser(t.Context(), "u1"); err != nil {
+		user, err := c.GetUser(t.Context(), "u1")
+		if err != nil {
 			t.Fatalf("GetUser: %v", err)
+		}
+		if user.ID != "u1" {
+			t.Errorf("user = %+v", user)
 		}
 		if got := calls.Load(); got != 2 {
 			t.Errorf("requests = %d, want 2", got)
@@ -576,5 +587,42 @@ func TestWithRetryPolicy_ZeroBaseDelayMeansNoDelay(t *testing.T) {
 	defer cancel()
 	if _, err = c.GetUser(ctx, "u1"); err != nil {
 		t.Fatalf("GetUser: %v", err)
+	}
+}
+
+type retryRoundTripper func(*http.Request) (*http.Response, error)
+
+func (f retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
+}
+
+func TestRetry_TransportErrorThenSuccess(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	transport := retryRoundTripper(func(r *http.Request) (*http.Response, error) {
+		if calls.Add(1) == 1 {
+			return nil, io.ErrUnexpectedEOF
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"id":"u1","email":"a@example.com"}`)),
+			Request:    r,
+		}, nil
+	})
+	c, err := rauthy.New("https://auth.example.com", "tf$secret",
+		retryTestPolicy(), rauthy.WithHTTPClient(&http.Client{Transport: transport}))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	user, err := c.GetUser(t.Context(), "u1")
+	if got := calls.Load(); got != 2 {
+		t.Errorf("attempts = %d, want 2", got)
+	}
+	if err != nil {
+		t.Fatalf("GetUser: %v", err)
+	}
+	if user.ID != "u1" || user.Email != "a@example.com" {
+		t.Errorf("user = %+v", user)
 	}
 }
