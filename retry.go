@@ -64,6 +64,7 @@ func (e *buildError) Unwrap() error { return e.err }
 // bytes rather than as a reader precisely so that every attempt can build a
 // fresh one: a reader consumed by attempt one has nothing left to give attempt
 // two, and silently sending an empty body would be worse than not retrying.
+// headers are set on every attempt; an empty value removes the header instead.
 func (c *Client) send(
 	ctx context.Context,
 	method, path string,
@@ -121,6 +122,12 @@ func (c *Client) attempt(
 		return nil, &buildError{err: err}
 	}
 	for k, v := range headers {
+		if v == "" {
+			// An empty value takes back a header newRequest set: it is how a
+			// call to a public endpoint leaves out the API key.
+			req.Header.Del(k)
+			continue
+		}
 		req.Header.Set(k, v)
 	}
 

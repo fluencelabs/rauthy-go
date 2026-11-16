@@ -163,6 +163,7 @@ func coveredTypes() []coveredType {
 			liveShape: []string{"ips"},
 		},
 		{value: rauthy.PamHostSecretResponse{}, schema: "PamHostSecretResponse"},
+		{value: rauthy.VersionResponse{}, schema: "AppVersionResponse"},
 	}
 }
 
