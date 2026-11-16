@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/fluencelabs/rauthy-go"
@@ -35,6 +37,9 @@ type updateCase struct {
 	// renamed maps a request property to the response property it carries
 	// when the two names differ.
 	renamed map[string]string
+	// notSent lists request properties of the spec the client deliberately
+	// never sends (see knownGaps).
+	notSent []string
 }
 
 func updateCases() []updateCase {
@@ -92,6 +97,7 @@ func updateCases() []updateCase {
 				}
 				return c.UpdateUserAttr(ctx, a.Name, a.UpdateRequest())
 			},
+			notSent: []string{"typ"},
 		},
 	}
 }
@@ -208,6 +214,12 @@ func checkCarried(t *testing.T, tc updateCase, sent, read map[string]any) {
 
 	reqProps := loadSpecSchemas(t)[tc.reqSchema].Properties
 	for name := range reqProps {
+		if slices.Contains(tc.notSent, name) {
+			if _, sentIt := sent[name]; sentIt {
+				t.Errorf("%s: PUT sent %q, which the client must never send", tc.name, name)
+			}
+			continue
+		}
 		from := name
 		if r, ok := tc.renamed[name]; ok {
 			from = r
@@ -246,9 +258,6 @@ func TestUpdateRequest_SharesNoMemory(t *testing.T) {
 	if attrReq.Desc != nil && attrReq.Desc == attr.Desc {
 		t.Error("UserAttrResponse.UpdateRequest shares Desc with the response")
 	}
-	if attrReq.Typ != nil && attrReq.Typ == attr.Typ {
-		t.Error("UserAttrResponse.UpdateRequest shares Typ with the response")
-	}
 }
 
 func checkRawUnshared(t *testing.T, field string, resp, req json.RawMessage) {
@@ -285,5 +294,36 @@ func assertJSON(t *testing.T, v any, want string) {
 	}
 	if string(got) != want {
 		t.Errorf("%T marshals to %s, want %s", v, got, want)
+	}
+}
+
+// A live Rauthy 0.36.2 strands an attribute written with a typ: a typed one can
+// no longer be updated or deleted, and an untyped one PUT with a typ drops out
+// of the listing. So the request never carries typ, not even when the
+// attribute read back has one, while the response still reports it.
+func TestUserAttr_TypIsReadOnly(t *testing.T) {
+	t.Parallel()
+
+	attr := decodeAs[rauthy.UserAttrResponse](t, []byte(fullAttrJSON))
+	if attr.Typ == nil || *attr.Typ != "Email" {
+		t.Errorf("UserAttrResponse.Typ = %v, want Email", attr.Typ)
+	}
+
+	raw, err := json.Marshal(attr.UpdateRequest())
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var sent map[string]any
+	if err = json.Unmarshal(raw, &sent); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if _, ok := sent["typ"]; ok {
+		t.Errorf("UpdateRequest body %s carries typ", raw)
+	}
+
+	for f := range reflect.TypeFor[rauthy.UserAttrRequest]().Fields() {
+		if name, _, _ := strings.Cut(f.Tag.Get("json"), ","); name == "typ" {
+			t.Errorf("UserAttrRequest.%s serialises as typ", f.Name)
+		}
 	}
 }

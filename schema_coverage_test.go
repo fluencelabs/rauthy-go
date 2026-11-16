@@ -167,7 +167,6 @@ func coveredTypes() []coveredType {
 		{value: rauthy.RoleResponse{}, schema: "RoleResponse"},
 		{value: rauthy.GroupRequest{}, schema: "GroupRequest", request: true},
 		{value: rauthy.GroupResponse{}, schema: "GroupResponse"},
-		{value: rauthy.UserAttrRequest{}, schema: "UserAttrConfigRequest", request: true},
 		{value: rauthy.UserAttrResponse{}, schema: "UserAttrConfigValueResponse"},
 		{value: rauthy.NewUserRequest{}, schema: "NewUserRequest", request: true},
 		{value: rauthy.UserResponse{}, schema: "UserResponse"},
@@ -185,6 +184,13 @@ func knownGaps() []coveredType {
 	// are responses, so nothing written back loses the keys.
 	authorizedKeys := []string{"authorized_keys"}
 	return []coveredType{
+		// Left out on purpose: against a live Rauthy 0.36.2, an attribute
+		// created with a typ answers PUT and DELETE /users/attr/{name} with 404
+		// "no rows returned", with or without typ in the body, and an untyped
+		// attribute PUT with a typ answers 200 and then drops out of
+		// GET /users/attr. Sending typ makes attributes that cannot be managed.
+		// UserAttrResponse still reads it.
+		{value: rauthy.UserAttrRequest{}, schema: "UserAttrConfigRequest", request: true, missing: []string{"typ"}},
 		{value: rauthy.PamUserResponse{}, schema: "PamUserResponse", missing: authorizedKeys},
 		{value: rauthy.PamUserDetailsResponse{}, schema: "PamUserDetailsResponse", missing: authorizedKeys},
 	}
