@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -76,7 +77,9 @@ func TestCreateClient_SendsAPIKeyHeaderAndMinimalBody(t *testing.T) {
 		gotPath = r.URL.Path
 		gotMethod = r.Method
 		raw, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(raw, &gotBody)
+		if err := json.Unmarshal(raw, &gotBody); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"app","enabled":true,"confidential":true,` +
@@ -86,7 +89,7 @@ func TestCreateClient_SendsAPIKeyHeaderAndMinimalBody(t *testing.T) {
 	})
 
 	name := "App"
-	_, err := c.CreateClient(context.Background(), rauthy.NewClientRequest{
+	got, err := c.CreateClient(context.Background(), rauthy.NewClientRequest{
 		ID:           "app",
 		Name:         &name,
 		Confidential: true,
@@ -96,6 +99,17 @@ func TestCreateClient_SendsAPIKeyHeaderAndMinimalBody(t *testing.T) {
 		t.Fatalf("CreateClient: %v", err)
 	}
 
+	wantBody := map[string]any{
+		"id": "app", "name": name, "confidential": true,
+		"redirect_uris": []any{"https://app.example.com/cb"},
+	}
+	if !reflect.DeepEqual(gotBody, wantBody) {
+		t.Errorf("body = %#v, want %#v", gotBody, wantBody)
+	}
+	if got.ID != "app" || !got.Confidential ||
+		!reflect.DeepEqual(got.RedirectURIs, []string{"https://app.example.com/cb"}) {
+		t.Errorf("client = %+v", got)
+	}
 	if gotAuth != "API-Key tf$secret" {
 		t.Errorf("Authorization = %q, want %q", gotAuth, "API-Key tf$secret")
 	}
@@ -185,8 +199,12 @@ func TestRotateClientSecret_SendsCacheCurrentHours(t *testing.T) {
 	})
 
 	hours := int64(6)
-	if _, err := c.RotateClientSecret(context.Background(), "app", &hours); err != nil {
+	got, err := c.RotateClientSecret(context.Background(), "app", &hours)
+	if err != nil {
 		t.Fatalf("RotateClientSecret: %v", err)
+	}
+	if got.ID != "app" || !got.Confidential || got.Secret == nil || *got.Secret != "new" {
+		t.Errorf("rotation = %+v", got)
 	}
 	if gotMethod != http.MethodPut {
 		t.Errorf("method = %s, want PUT", gotMethod)
@@ -207,8 +225,12 @@ func TestRotateClientSecret_OmitsCacheCurrentHoursWhenUnset(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"app","confidential":true,"secret":"new"}`))
 	})
 
-	if _, err := c.RotateClientSecret(context.Background(), "app", nil); err != nil {
+	got, err := c.RotateClientSecret(context.Background(), "app", nil)
+	if err != nil {
 		t.Fatalf("RotateClientSecret: %v", err)
+	}
+	if got.ID != "app" || !got.Confidential || got.Secret == nil || *got.Secret != "new" {
+		t.Errorf("rotation = %+v", got)
 	}
 	if _, ok := gotBody["cache_current_hours"]; ok {
 		t.Error("cache_current_hours present in body, want it omitted so Rauthy applies its own default")

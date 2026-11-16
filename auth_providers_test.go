@@ -149,6 +149,13 @@ func TestUpdateAuthProvider_ToleratesEmptyBody(t *testing.T) {
 	var gotMethod, gotPath string
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		gotMethod, gotPath = r.Method, r.URL.Path
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode provider: %v", err)
+		}
+		if body["name"] != "Example IdP" || body["typ"] != "oidc" {
+			t.Errorf("body = %v", body)
+		}
 		w.WriteHeader(http.StatusOK)
 	})
 

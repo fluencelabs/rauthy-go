@@ -94,6 +94,13 @@ func TestUpdateRole_PutsToRolePath(t *testing.T) {
 	var gotMethod, gotPath string
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		gotMethod, gotPath = r.Method, r.URL.Path
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode role: %v", err)
+		}
+		if body["role"] != "operator" {
+			t.Errorf("body = %v, want role=operator", body)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"role-1","name":"operator"}`))
 	})
