@@ -26,9 +26,11 @@ type VersionResponse struct {
 	UpdateAvailable bool `json:"update_available"`
 }
 
-// GetVersion issues GET /version. Rauthy serves it to anyone: the OpenAPI
-// document names no access right for it and declares no 401 or 403, so the
-// request goes out without the API key.
+// GetVersion issues GET /version, without the API key. Rauthy serves the
+// endpoint to anyone: its OpenAPI document names no access right for it, and a
+// live 0.36.2 answers 200 to a request without credentials. Sending the key
+// would only add a way to fail: the same server answers 400 to an invalid API
+// key, so a revoked or mistyped key would break a call that needs none.
 func (c *Client) GetVersion(ctx context.Context) (*VersionResponse, error) {
 	resp, err := c.send(ctx, http.MethodGet, "/version", nil, map[string]string{"Authorization": ""})
 	if err != nil {

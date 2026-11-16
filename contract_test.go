@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -749,12 +750,60 @@ func TestContract_VersionResponse(t *testing.T) {
 	}
 }
 
+// permissionsMarker is how the spec marks an operation that needs an access
+// right: its description carries a "**Permissions**" heading listing them.
+const permissionsMarker = "**Permissions**"
+
+// operationDescription returns the description of one operation of the
+// vendored spec, by its path without the API base path.
+func operationDescription(t *testing.T, path, method string) string {
+	t.Helper()
+
+	specPath, err := mock.SpecPath()
+	if err != nil {
+		t.Fatalf("locate spec: %v", err)
+	}
+	raw, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	var doc struct {
+		Paths map[string]map[string]struct {
+			Description string `json:"description"`
+		} `json:"paths"`
+	}
+	if err = json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	op, ok := doc.Paths[path][method]
+	if !ok {
+		t.Fatalf("the spec has no %s %s", method, path)
+	}
+	return op.Description
+}
+
 // GetVersion sends no API key because the spec documents GET /version as
-// public: unlike the admin endpoints, it names no permission and declares no
-// 401 or 403. Both halves are pinned, so a spec that starts guarding the
-// endpoint fails here instead of leaving GetVersion answering 401.
+// public. What says so is the description: the spec marks every operation that
+// needs an access right with a permissions heading, and this one has none. The
+// missing 401 and 403 back that up but prove nothing alone — PUT and DELETE
+// /providers/{id} are admin operations that declare neither. Every half is
+// pinned, so a spec that starts guarding the endpoint fails here instead of
+// leaving GetVersion answering 401.
 func TestContract_VersionNeedsNoAuthentication(t *testing.T) {
 	v := newContractValidator(t)
+
+	// Control: the marker is how the admin operations without a 401 or 403
+	// say they need a right.
+	for _, method := range []string{"put", "delete"} {
+		if desc := operationDescription(t, "/providers/{id}", method); !strings.Contains(desc, permissionsMarker) {
+			t.Fatalf("control: %s /providers/{id} no longer carries %q; find the new permission marker",
+				method, permissionsMarker)
+		}
+	}
+	if desc := operationDescription(t, "/version", "get"); strings.Contains(desc, permissionsMarker) {
+		t.Errorf("the spec now names a permission for GET /version: %q; re-check that GetVersion "+
+			"still sends no API key", desc)
+	}
 
 	ok, msg := validateRequest(t, v, http.MethodGet, apiPath("/version"), nil)
 	if !ok {
