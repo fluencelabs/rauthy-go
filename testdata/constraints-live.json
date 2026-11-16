@@ -1,0 +1,1695 @@
+[
+  {
+    "id": "L1-G1#0",
+    "resource": "client",
+    "field": "name",
+    "value": "My App (prod)",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "My App (prod)"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "My App (prod)"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G1#1",
+    "resource": "client",
+    "field": "contacts",
+    "value": "mailto:ops@example.com",
+    "validator": "Contact",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "contacts": [
+            "mailto:ops@example.com"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "contacts": [
+            "mailto:ops@example.com"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G1#2",
+    "resource": "client",
+    "field": "flows_enabled",
+    "value": "urn:ietf:params:oauth:grant-type:token-exchange",
+    "validator": "GrantTypes",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "flows_enabled": [
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "flows_enabled": [
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G1#3",
+    "resource": "client",
+    "field": "access_token_alg",
+    "value": "Ed25519",
+    "validator": "SigningAlgs",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `Ed25519`, expected one of `RS256`, `RS384`, `RS512`, `EdDSA` at line 1 column 184"
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "access_token_alg": "Ed25519"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G1#6",
+    "resource": "client",
+    "field": "allowed_origins",
+    "value": "tauri://localhost",
+    "validator": "Origin",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "allowed_origins": [
+            "tauri://localhost"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "allowed_origins": [
+            "tauri://localhost"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G2#0",
+    "resource": "client",
+    "field": "flows_enabled",
+    "value": "urn:ietf:params:oauth:grant-type:token-exchange",
+    "validator": "GrantTypes",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "flows_enabled": [
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "flows_enabled": [
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G2#1",
+    "resource": "client",
+    "field": "name",
+    "value": "Панель",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849817,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"Панель\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "Панель"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G2#2",
+    "resource": "client",
+    "field": "contacts",
+    "value": "mailto:ops@example.com",
+    "validator": "Contact",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "contacts": [
+            "mailto:ops@example.com"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "contacts": [
+            "mailto:ops@example.com"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G3#2",
+    "resource": "user",
+    "field": "given_name",
+    "value": "太郎",
+    "validator": "UserName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "given_name": "太郎"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "given_name": "太郎"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G3#3",
+    "resource": "provider",
+    "field": "name",
+    "value": "Company (SSO)",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "Company (SSO)"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "Company (SSO)"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G3#4",
+    "resource": "attribute",
+    "field": "desc",
+    "value": "Department name",
+    "validator": "AttributeDescription",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "desc": "Department name"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "desc": "Department name"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G3#5",
+    "resource": "provider",
+    "field": "client_id",
+    "value": "service@example.com",
+    "validator": "URI",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "client_id": "service@example.com"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "client_id": "service@example.com"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G3#6",
+    "resource": "provider",
+    "field": "scope",
+    "value": "openid read.profile",
+    "validator": "AuthProviderScope",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "scope": "openid+read.profile"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "scope": "openid+read.profile"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G3#9",
+    "resource": "user",
+    "field": "language",
+    "value": "ja",
+    "validator": "Languages",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `ja`, expected one of `de`, `en`, `fr`, `ko`, `nb`, `nl`, `ru`, `uk`, `zhhans` at line 1 column 78"
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "language": "ja"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G4#1",
+    "resource": "blacklist",
+    "field": "ip",
+    "value": "fe80::1%eth0",
+    "validator": "IPAddress",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: invalid IP address syntax at line 1 column 21"
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": "Json deserialize error: invalid IP address syntax at line 1 column 21"
+      }
+    }
+  },
+  {
+    "id": "L1-G5#1",
+    "resource": "provider",
+    "field": "name",
+    "value": "ログイン",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "ログイン"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "ログイン"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G5#2",
+    "resource": "user",
+    "field": "given_name",
+    "value": "山田",
+    "validator": "UserName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "given_name": "山田"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "given_name": "山田"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G5#3",
+    "resource": "user",
+    "field": "language",
+    "value": "nl",
+    "validator": "Languages",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "language": "nl"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "language": "nl"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G5#4",
+    "resource": "attribute",
+    "field": "desc",
+    "value": "Employee number",
+    "validator": "AttributeDescription",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "desc": "Employee number"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "desc": "Employee number"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G5#5",
+    "resource": "provider",
+    "field": "scope",
+    "value": "https://www.googleapis.com/auth/userinfo.email",
+    "validator": "AuthProviderScope",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "scope": "https://www.googleapis.com/auth/userinfo.email"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "scope": "https://www.googleapis.com/auth/userinfo.email"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G5#6",
+    "resource": "provider",
+    "field": "client_id",
+    "value": "service@example.com",
+    "validator": "URI",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "client_id": "service@example.com"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "client_id": "service@example.com"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G5#7",
+    "resource": "client",
+    "field": "contacts",
+    "value": "mailto:ops@example.com",
+    "validator": "Contact",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "contacts": [
+            "mailto:ops@example.com"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "contacts": [
+            "mailto:ops@example.com"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G5#8",
+    "resource": "client",
+    "field": "allowed_origins",
+    "value": "tauri://localhost",
+    "validator": "Origin",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "allowed_origins": [
+            "tauri://localhost"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "allowed_origins": [
+            "tauri://localhost"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G5#9",
+    "resource": "client",
+    "field": "flows_enabled",
+    "value": "urn:ietf:params:oauth:grant-type:token-exchange",
+    "validator": "GrantTypes",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "flows_enabled": [
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "flows_enabled": [
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G7#0",
+    "resource": "client",
+    "field": "name",
+    "value": "Console (stage)",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "Console (stage)"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "Console (stage)"
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G7#1",
+    "resource": "client",
+    "field": "contacts",
+    "value": "https://example.com",
+    "validator": "Contact",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "contacts": [
+            "https://example.com"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "contacts": [
+            "https://example.com"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G7#2",
+    "resource": "client",
+    "field": "flows_enabled",
+    "value": "urn:ietf:params:oauth:grant-type:token-exchange",
+    "validator": "GrantTypes",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "flows_enabled": [
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "flows_enabled": [
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "L1-G7#3",
+    "resource": "client",
+    "field": "redirect_uris",
+    "value": "https://example.com/#/callback",
+    "validator": "URI",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "redirect_uris": [
+            "https://example.com/#/callback"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"redirect_uris\": Field([ValidationError { code: \"valid URI with a non-empty host part, without # or ,\", message: None, params: {\"value\": Array [String(\"https://example.com/#/callback\")]} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "2:L1-G3#0",
+    "resource": "profile",
+    "field": "tz",
+    "value": "GMT0",
+    "validator": "Timezone",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "tz": "GMT0"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "tz": "GMT0"
+        }
+      }
+    }
+  },
+  {
+    "id": "2:L1-G3#1",
+    "resource": "group",
+    "field": "group",
+    "value": "Engineering Team",
+    "validator": "Group",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "Engineering Team"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "Engineering Team"
+        }
+      }
+    }
+  },
+  {
+    "id": "2:L1-G5#0",
+    "resource": "profile",
+    "field": "tz",
+    "value": "EST5EDT",
+    "validator": "Timezone",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "tz": "EST5EDT"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "tz": "EST5EDT"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'Приложение'",
+    "resource": "client",
+    "field": "name",
+    "value": "Приложение",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"Приложение\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "Приложение"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'app.prod'",
+    "resource": "client",
+    "field": "name",
+    "value": "app.prod",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"app.prod\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "app.prod"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'App v1.2_beta'",
+    "resource": "client",
+    "field": "name",
+    "value": "App v1.2_beta",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"App v1.2_beta\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "App v1.2_beta"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'App\\xa0Name'",
+    "resource": "client",
+    "field": "name",
+    "value": "App Name",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "App Name"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "App Name"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'App\\nName'",
+    "resource": "client",
+    "field": "name",
+    "value": "App\nName",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "App\nName"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[\\\\p{L}\\\\p{M}\\\\p{N}\\\\p{Zs}()._-]{2,128}\", message: None, params: {\"value\": String(\"App\\nName\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'App\\x85Name'",
+    "resource": "client",
+    "field": "name",
+    "value": "AppName",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "AppName"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[\\\\p{L}\\\\p{M}\\\\p{N}\\\\p{Zs}()._-]{2,128}\", message: None, params: {\"value\": String(\"App\\u{85}Name\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'App\\u2028Name'",
+    "resource": "client",
+    "field": "name",
+    "value": "App Name",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "App Name"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[\\\\p{L}\\\\p{M}\\\\p{N}\\\\p{Zs}()._-]{2,128}\", message: None, params: {\"value\": String(\"App\\u{2028}Name\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'App × Name'",
+    "resource": "client",
+    "field": "name",
+    "value": "App × Name",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "App × Name"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[\\\\p{L}\\\\p{M}\\\\p{N}\\\\p{Zs}()._-]{2,128}\", message: None, params: {\"value\": String(\"App × Name\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "name-'école'",
+    "resource": "client",
+    "field": "name",
+    "value": "école",
+    "validator": "ClientName",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"e\\u{301}cole\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "école"
+        }
+      }
+    }
+  },
+  {
+    "id": "language-es",
+    "resource": "user",
+    "field": "language",
+    "value": "es",
+    "validator": "Languages",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `es`, expected one of `de`, `en`, `fr`, `ko`, `nb`, `nl`, `ru`, `uk`, `zhhans` at line 1 column 78"
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "language": "es"
+        }
+      }
+    }
+  },
+  {
+    "id": "language-pt",
+    "resource": "user",
+    "field": "language",
+    "value": "pt",
+    "validator": "Languages",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `pt`, expected one of `de`, `en`, `fr`, `ko`, `nb`, `nl`, `ru`, `uk`, `zhhans` at line 1 column 78"
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "language": "pt"
+        }
+      }
+    }
+  },
+  {
+    "id": "redirect-https://example.com/a,b",
+    "resource": "client",
+    "field": "redirect_uris",
+    "value": "https://example.com/a,b",
+    "validator": "URI",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "redirect_uris": [
+            "https://example.com/a",
+            "b"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"redirect_uris\": Field([ValidationError { code: \"valid URI with a non-empty host part, without # or ,\", message: None, params: {\"value\": Array [String(\"https://example.com/a,b\")]} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "redirect-/cb",
+    "resource": "client",
+    "field": "redirect_uris",
+    "value": "/cb",
+    "validator": "URI",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "redirect_uris": [
+            "/cb"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"redirect_uris\": Field([ValidationError { code: \"valid URI with a non-empty host part, without # or ,\", message: None, params: {\"value\": Array [String(\"/cb\")]} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "redirect-https://",
+    "resource": "client",
+    "field": "redirect_uris",
+    "value": "https://",
+    "validator": "URI",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "redirect_uris": [
+            "https://"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"redirect_uris\": Field([ValidationError { code: \"valid URI with a non-empty host part, without # or ,\", message: None, params: {\"value\": Array [String(\"https://\")]} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "redirect-https://example.com/cb?x=1",
+    "resource": "client",
+    "field": "redirect_uris",
+    "value": "https://example.com/cb?x=1",
+    "validator": "URI",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "redirect_uris": [
+            "https://example.com/cb?x=1"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "redirect_uris": [
+            "https://example.com/cb?x=1"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "redirect-tauri://localhost/callback",
+    "resource": "client",
+    "field": "redirect_uris",
+    "value": "tauri://localhost/callback",
+    "validator": "URI",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "redirect_uris": [
+            "tauri://localhost/callback"
+          ]
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "redirect_uris": [
+            "tauri://localhost/callback"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": "profile-city-'New\\xa0York'",
+    "resource": "profile",
+    "field": "city",
+    "value": "New York",
+    "validator": "City",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "city": "New York"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "city": "New York"
+        }
+      }
+    }
+  },
+  {
+    "id": "profile-street-'Main\\xa0Street'",
+    "resource": "profile",
+    "field": "street",
+    "value": "Main Street",
+    "validator": "Street",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "street": "Main Street"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "street": "Main Street"
+        }
+      }
+    }
+  },
+  {
+    "id": "profile-city-'New\\nYork'",
+    "resource": "profile",
+    "field": "city",
+    "value": "New\nYork",
+    "validator": "City",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "city": "New\nYork"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"user_values\": Struct(ValidationErrors({\"city\": Field([ValidationError { code: \"[a-zA-Z0-9À-ÿ-\\\\s]{0,48}\", message: None, params: {\"value\": String(\"New\\nYork\")} }])}))})"
+        }
+      }
+    }
+  },
+  {
+    "id": "profile-tz-'GB-Eire'",
+    "resource": "profile",
+    "field": "tz",
+    "value": "GB-Eire",
+    "validator": "Timezone",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "tz": "GB-Eire"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "tz": "GB-Eire"
+        }
+      }
+    }
+  },
+  {
+    "id": "profile-tz-'W-SU'",
+    "resource": "profile",
+    "field": "tz",
+    "value": "W-SU",
+    "validator": "Timezone",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "tz": "W-SU"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "tz": "W-SU"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-ClientName",
+    "resource": "client",
+    "field": "name",
+    "value": "😉",
+    "validator": "ClientName",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"😉\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[\\\\p{L}\\\\p{M}\\\\p{N}\\\\p{Zs}()._-]{2,128}\", message: None, params: {\"value\": String(\"😉\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-ClientName-x",
+    "resource": "client",
+    "field": "name",
+    "value": "x",
+    "validator": "ClientName",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"x\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[\\\\p{L}\\\\p{M}\\\\p{N}\\\\p{Zs}()._-]{2,128}\", message: None, params: {\"value\": String(\"x\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-GrantTypes",
+    "resource": "client",
+    "field": "flows_enabled",
+    "value": "invalid",
+    "validator": "GrantTypes",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `invalid`, expected one of `authorization_code`, `client_credentials`, `password`, `refresh_token`, `urn:ietf:params:oauth:grant-type:device_code`, `urn:ietf:params:oauth:grant-type:token-exchange` at line 1 column 141"
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `invalid`, expected one of `authorization_code`, `client_credentials`, `password`, `refresh_token`, `urn:ietf:params:oauth:grant-type:device_code`, `urn:ietf:params:oauth:grant-type:token-exchange` at line 1 column 141"
+      }
+    }
+  },
+  {
+    "id": "negative-SigningAlgs",
+    "resource": "client",
+    "field": "access_token_alg",
+    "value": "HS256",
+    "validator": "SigningAlgs",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `HS256`, expected one of `RS256`, `RS384`, `RS512`, `EdDSA` at line 1 column 182"
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `HS256`, expected one of `RS256`, `RS384`, `RS512`, `EdDSA`, `Ed25519` at line 1 column 182"
+      }
+    }
+  },
+  {
+    "id": "negative-Contact",
+    "resource": "client",
+    "field": "contacts",
+    "value": "ops@example.com<script>",
+    "validator": "Contact",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"contacts\": Field([ValidationError { code: \"^[a-zA-Z0-9\\\\+.@/-]{0,48}$\", message: None, params: {\"value\": Array [String(\"ops@example.com<script>\")]} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"contacts\": Field([ValidationError { code: \"^[a-zA-Z0-9\\\\+.@/-]{0,48}$\", message: None, params: {\"value\": Array [String(\"ops@example.com<script>\")]} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-Languages",
+    "resource": "user",
+    "field": "language",
+    "value": "xx",
+    "validator": "Languages",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `xx`, expected one of `de`, `en`, `fr`, `ko`, `nb`, `nl`, `ru`, `uk`, `zhhans` at line 1 column 78"
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": "Json deserialize error: unknown variant `xx`, expected one of `de`, `en`, `es`, `fr`, `ja`, `ko`, `nb`, `nl`, `pt`, `ru`, `uk`, `zhhans` at line 1 column 78"
+      }
+    }
+  },
+  {
+    "id": "negative-UserName",
+    "resource": "user",
+    "field": "given_name",
+    "value": "😉",
+    "validator": "UserName",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"given_name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-'\\\\s]{1,32}\", message: None, params: {\"value\": String(\"😉\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"given_name\": Field([ValidationError { code: \"[\\\\p{L}\\\\p{M}\\\\p{N}\\\\p{Zs}'.-]{1,32}\", message: None, params: {\"value\": String(\"😉\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-AuthProviderScope",
+    "resource": "provider",
+    "field": "scope",
+    "value": "openid #bad",
+    "validator": "AuthProviderScope",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"scope\": Field([ValidationError { code: \"[a-zA-Z0-9-_/:\\\\s*]{0,512}\", message: None, params: {\"value\": String(\"openid #bad\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"scope\": Field([ValidationError { code: \"[a-zA-Z0-9-_/:\\\\s*]{0,512}\", message: None, params: {\"value\": String(\"openid #bad\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-URI",
+    "resource": "provider",
+    "field": "client_id",
+    "value": "bad value",
+    "validator": "URI",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"client_id\": Field([ValidationError { code: \"[a-zA-Z0-9,.:/_\\\\-&?=~#!$'()*+%]\", message: None, params: {\"value\": String(\"bad value\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"client_id\": Field([ValidationError { code: \"[a-zA-Z0-9,.:/_\\\\-&?=~#!$'()*+%]\", message: None, params: {\"value\": String(\"bad value\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-AttributeDescription",
+    "resource": "attribute",
+    "field": "desc",
+    "value": "<script>",
+    "validator": "AttributeDescription",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"desc\": Field([ValidationError { code: \"[a-zA-Z0-9À-ÿ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"<script>\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"desc\": Field([ValidationError { code: \"[a-zA-Z0-9À-ÿ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"<script>\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-Group",
+    "resource": "group",
+    "field": "group",
+    "value": "<bad>",
+    "validator": "Group",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"group\": Field([ValidationError { code: \"^[a-zA-Z0-9-_/,:*\\\\s]{2,64}$\", message: None, params: {\"value\": String(\"<bad>\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"group\": Field([ValidationError { code: \"^[a-zA-Z0-9-_/,:*\\\\s]{2,64}$\", message: None, params: {\"value\": String(\"<bad>\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-City",
+    "resource": "profile",
+    "field": "city",
+    "value": "<bad>",
+    "validator": "City",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"user_values\": Struct(ValidationErrors({\"city\": Field([ValidationError { code: \"[a-zA-Z0-9À-ÿ-\\\\s]{0,48}\", message: None, params: {\"value\": String(\"<bad>\")} }])}))})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"user_values\": Struct(ValidationErrors({\"city\": Field([ValidationError { code: \"[a-zA-Z0-9À-ÿ-\\\\s]{0,48}\", message: None, params: {\"value\": String(\"<bad>\")} }])}))})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-Street",
+    "resource": "profile",
+    "field": "street",
+    "value": "<bad>",
+    "validator": "Street",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"user_values\": Struct(ValidationErrors({\"street\": Field([ValidationError { code: \"[a-zA-Z0-9À-ÿ-.\\\\s]{0,48}\", message: None, params: {\"value\": String(\"<bad>\")} }])}))})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"user_values\": Struct(ValidationErrors({\"street\": Field([ValidationError { code: \"[a-zA-Z0-9À-ÿ-.\\\\s]{0,48}\", message: None, params: {\"value\": String(\"<bad>\")} }])}))})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-IPAddress",
+    "resource": "blacklist",
+    "field": "ip",
+    "value": "999.0.0.1",
+    "validator": "IPAddress",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": "Json deserialize error: invalid IP address syntax at line 1 column 18"
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": "Json deserialize error: invalid IP address syntax at line 1 column 18"
+      }
+    }
+  },
+  {
+    "id": "negative-Origin",
+    "resource": "client",
+    "field": "allowed_origins",
+    "value": "https://example.com/path",
+    "validator": "Origin",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"allowed_origins\": Field([ValidationError { code: \"^(http|https)://[a-z0-9.:-]+$\", message: None, params: {\"value\": Array [String(\"https://example.com/path\")]} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"allowed_origins\": Field([ValidationError { code: \"^(http|https)://[a-z0-9.:-]+$\", message: None, params: {\"value\": Array [String(\"https://example.com/path\")]} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "positive-ip",
+    "resource": "blacklist",
+    "field": "ip",
+    "value": "2001:db8::2",
+    "validator": "IPAddress",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": null
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": null
+      }
+    }
+  },
+  {
+    "id": "positive-scope",
+    "resource": "scope",
+    "field": "scope",
+    "value": "read.profile",
+    "validator": "Scope",
+    "expected": true,
+    "responses": {
+      "0.36.2": {
+        "status": 200,
+        "body": {
+          "name": "read.profile"
+        }
+      },
+      "0.37.2": {
+        "status": 200,
+        "body": {
+          "name": "read.profile"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-scope",
+    "resource": "scope",
+    "field": "scope",
+    "value": "bad#scope",
+    "validator": "Scope",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"scope\": Field([ValidationError { code: \"^[a-zA-Z0-9-_/,:*.]{2,64}$\", message: None, params: {\"value\": String(\"bad#scope\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"scope\": Field([ValidationError { code: \"^[a-zA-Z0-9-_/,:*.]{2,64}$\", message: None, params: {\"value\": String(\"bad#scope\")} }])})"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-timezone",
+    "resource": "profile",
+    "field": "tz",
+    "value": "bad zone",
+    "validator": "Timezone",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "'tz' cannot be parsed"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "'tz' cannot be parsed"
+        }
+      }
+    }
+  },
+  {
+    "id": "negative-mixed-version-name",
+    "resource": "client",
+    "field": "name",
+    "value": "Панель\nName",
+    "validator": "ClientName",
+    "expected": false,
+    "responses": {
+      "0.36.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849818,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[a-zA-Z0-9À-ɏ-\\\\s]{2,128}\", message: None, params: {\"value\": String(\"Панель\\nName\")} }])})"
+        }
+      },
+      "0.37.2": {
+        "status": 400,
+        "body": {
+          "timestamp": 1794849830,
+          "error": "BadRequest",
+          "message": "Payload validation error: ValidationErrors({\"name\": Field([ValidationError { code: \"[\\\\p{L}\\\\p{M}\\\\p{N}\\\\p{Zs}()._-]{2,128}\", message: None, params: {\"value\": String(\"Панель\\nName\")} }])})"
+        }
+      }
+    }
+  }
+]
