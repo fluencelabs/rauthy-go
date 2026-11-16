@@ -52,3 +52,37 @@ func ExampleNew() {
 	fmt.Println(created.ID, *secret.Secret)
 	// Output: example-app s3cr3t
 }
+
+// ExampleClient_GetVersion gates a feature on the Rauthy release the server
+// runs. GET /version needs no access right, so any API key will do.
+func ExampleClient_GetVersion() {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method+" "+r.URL.Path != "GET /auth/v1/version" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"current":"0.36.2","last_check":1788076923,"latest":"0.37.2",` +
+			`"latest_url":"https://github.com/sebadob/rauthy/releases/tag/v0.37.2","update_available":true}`))
+	}))
+	defer srv.Close()
+
+	c, err := rauthy.New(srv.URL, "example-api-key")
+	if err != nil {
+		fmt.Println("new client:", err)
+		return
+	}
+
+	v, err := c.GetVersion(context.Background())
+	if err != nil {
+		fmt.Println("read version:", err)
+		return
+	}
+	ok, err := v.AtLeast(0, 37)
+	if err != nil {
+		fmt.Println("compare version:", err)
+		return
+	}
+	fmt.Println(v.Current, "at least 0.37:", ok)
+	// Output: 0.36.2 at least 0.37: false
+}

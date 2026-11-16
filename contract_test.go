@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -57,11 +58,6 @@ func validateRequest(t *testing.T, v validator.Validator, method, path string, b
 	return ok, joinErrs(valErrs)
 }
 
-// The method and status parameters are spelled out at every call site even
-// though every response contract checked so far is a 200 on GET; they keep the
-// helper honest if a non-GET response is ever validated.
-//
-//nolint:unparam // deliberately general; see above
 func validateResponse(
 	t *testing.T,
 	v validator.Validator,
@@ -726,5 +722,106 @@ func TestContract_BlacklistResponse(t *testing.T) {
 		`{"ips":[{"ip":"203.0.113.7","exp":4102444800},{"ip":"2001:db8::2","exp":4102444800}]}`)
 	if !ok {
 		t.Errorf("GET /blacklist response rejected by the spec: %s", msg)
+	}
+}
+
+func TestContract_VersionResponse(t *testing.T) {
+	v := newContractValidator(t)
+
+	ok, msg := validateResponse(t, v, http.MethodGet, apiPath("/version"), http.StatusOK, liveVersionBody)
+	if !ok {
+		t.Errorf("GET /version response rejected by the spec: %s", msg)
+	}
+
+	// Only current and update_available are required; the rest is null until
+	// Rauthy has checked for a newer release.
+	minimal := `{"current":"0.36.2","last_check":null,"latest":null,"latest_url":null,"update_available":false}`
+	ok, msg = validateResponse(t, v, http.MethodGet, apiPath("/version"), http.StatusOK, minimal)
+	if !ok {
+		t.Errorf("GET /version response with nulls rejected by the spec: %s", msg)
+	}
+
+	var got rauthy.VersionResponse
+	if err := json.Unmarshal([]byte(minimal), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Current != "0.36.2" || got.LastCheck != nil || got.Latest != nil || got.LatestURL != nil {
+		t.Errorf("decoded %+v", got)
+	}
+}
+
+// permissionsMarker is how the spec marks an operation that needs an access
+// right: its description carries a "**Permissions**" heading listing them.
+const permissionsMarker = "**Permissions**"
+
+// operationDescription returns the description of one operation of the
+// vendored spec, by its path without the API base path.
+func operationDescription(t *testing.T, path, method string) string {
+	t.Helper()
+
+	specPath, err := mock.SpecPath()
+	if err != nil {
+		t.Fatalf("locate spec: %v", err)
+	}
+	raw, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	var doc struct {
+		Paths map[string]map[string]struct {
+			Description string `json:"description"`
+		} `json:"paths"`
+	}
+	if err = json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	op, ok := doc.Paths[path][method]
+	if !ok {
+		t.Fatalf("the spec has no %s %s", method, path)
+	}
+	return op.Description
+}
+
+// GetVersion sends no API key because the spec documents GET /version as
+// public. What says so is the description: the spec marks every operation that
+// needs an access right with a permissions heading, and this one has none. The
+// missing 401 and 403 back that up but prove nothing alone — PUT and DELETE
+// /providers/{id} are admin operations that declare neither. Every half is
+// pinned, so a spec that starts guarding the endpoint fails here instead of
+// leaving GetVersion answering 401.
+func TestContract_VersionNeedsNoAuthentication(t *testing.T) {
+	v := newContractValidator(t)
+
+	// Control: the marker is how the admin operations without a 401 or 403
+	// say they need a right.
+	for _, method := range []string{"put", "delete"} {
+		if desc := operationDescription(t, "/providers/{id}", method); !strings.Contains(desc, permissionsMarker) {
+			t.Fatalf("control: %s /providers/{id} no longer carries %q; find the new permission marker",
+				method, permissionsMarker)
+		}
+	}
+	if desc := operationDescription(t, "/version", "get"); strings.Contains(desc, permissionsMarker) {
+		t.Errorf("the spec now names a permission for GET /version: %q; re-check that GetVersion "+
+			"still sends no API key", desc)
+	}
+
+	ok, msg := validateRequest(t, v, http.MethodGet, apiPath("/version"), nil)
+	if !ok {
+		t.Errorf("GET /version without credentials rejected by the spec: %s", msg)
+	}
+
+	// The error body is checked against an admin endpoint first, so that a
+	// rejection below is about the status and not about the body.
+	const denied = `{"timestamp":1788076923,"error":"Unauthorized","message":"no credentials"}`
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+		ok, msg = validateResponse(t, v, http.MethodGet, apiPath("/roles"), status, denied)
+		if !ok {
+			t.Fatalf("control: a %d from GET /roles rejected by the spec: %s", status, msg)
+		}
+		ok, _ = validateResponse(t, v, http.MethodGet, apiPath("/version"), status, denied)
+		if ok {
+			t.Errorf("the spec now declares a %d for GET /version; it may need the API key — "+
+				"re-check that GetVersion still sends none", status)
+		}
 	}
 }
