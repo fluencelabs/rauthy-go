@@ -64,7 +64,8 @@ add up to at most 1.4 seconds. A runnable version of the example is `ExampleNew`
 
 `UpdateClient` is a full replace: a field the body leaves out is reset, so
 build the body with `GetClient(...).UpdateRequest()` and change only what the
-update is about.
+update is about. Scopes, roles, groups and user attributes work the same way,
+each response type carrying an `UpdateRequest()`.
 
 ### Validation
 
@@ -96,7 +97,7 @@ The OpenAPI document cannot express value ranges, so the contract tests check
 field sets and types, not the constraints in `validation.go`.
 `TestSchemaCoverage` compares the field sets of the wire types it lists with
 the spec's schemas; the types that still miss spec properties are recorded in
-its `knownGaps` table, property by property, and are not fixed yet.
+its `knownGaps` table, property by property, with the reason each is left out.
 
 ## Refreshing the spec
 

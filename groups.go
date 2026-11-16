@@ -1,7 +1,9 @@
 package rauthy
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 )
@@ -10,11 +12,24 @@ import (
 type GroupResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// Meta is free-form JSON attached to the group, passed through verbatim.
+	Meta json.RawMessage `json:"meta,omitempty"`
+}
+
+// UpdateRequest returns a PUT /groups/{id} body that keeps every setting of g.
+// The PUT replaces the group wholesale, so start from this and change only
+// what the update is about: a body assembled field by field resets whatever it
+// leaves out, meta included. The result shares no memory with g.
+func (g *GroupResponse) UpdateRequest() GroupRequest {
+	return GroupRequest{Group: g.Name, Meta: bytes.Clone(g.Meta)}
 }
 
 // GroupRequest is the body of POST /groups and PUT /groups/{id}.
 type GroupRequest struct {
 	Group string `json:"group"`
+	// Meta is free-form JSON attached to the group. Left empty it is not sent,
+	// which on a PUT clears what the group carried.
+	Meta json.RawMessage `json:"meta,omitempty"`
 }
 
 func groupPath(id string) string {
@@ -69,8 +84,9 @@ func (c *Client) GetGroupByName(ctx context.Context, name string) (*GroupRespons
 	return nil, notFoundError("/groups", "no group named "+name)
 }
 
-// UpdateGroup issues PUT /groups/{id}, renaming the group. Requires
-// Groups:Update.
+// UpdateGroup issues PUT /groups/{id}, replacing the group wholesale: build
+// req with GroupResponse.UpdateRequest from a GetGroup result and change only
+// what the update is about. Requires Groups:Update.
 func (c *Client) UpdateGroup(ctx context.Context, id string, req GroupRequest) (*GroupResponse, error) {
 	var out GroupResponse
 	if err := c.do(ctx, http.MethodPut, groupPath(id), req, &out); err != nil {

@@ -1,6 +1,7 @@
 package rauthy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -13,14 +14,15 @@ import (
 // as raw bytes rather than being forced into a Go type: Rauthy stores whatever
 // it is handed and gives it back unchanged.
 //
-// `typ` is deliberately absent. Rauthy's own OpenAPI document describes it as
-// "Currently ignored - will be implemented in a future version", and its only
-// enum member is `Email`, so sending it would be a no-op field that callers
-// would then have to keep supplying forever for compatibility.
+// Typ is the attribute's value type; the only one Rauthy 0.36.2 knows is
+// "Email", and its OpenAPI document says the field is not acted on yet. Rauthy
+// returns it on the response all the same, so it is carried here to survive a
+// PUT built with UserAttrResponse.UpdateRequest.
 type UserAttrRequest struct {
 	Name         string          `json:"name"`
 	Desc         *string         `json:"desc,omitempty"`
 	DefaultValue json.RawMessage `json:"default_value,omitempty"`
+	Typ          *string         `json:"typ,omitempty"`
 	UserEditable *bool           `json:"user_editable,omitempty"`
 }
 
@@ -30,7 +32,24 @@ type UserAttrResponse struct {
 	Name         string          `json:"name"`
 	Desc         *string         `json:"desc,omitempty"`
 	DefaultValue json.RawMessage `json:"default_value,omitempty"`
+	Typ          *string         `json:"typ,omitempty"`
 	UserEditable bool            `json:"user_editable"`
+}
+
+// UpdateRequest returns a PUT /users/attr/{name} body that keeps every setting
+// of a. The PUT replaces the attribute wholesale, so start from this and change
+// only what the update is about: a body assembled field by field resets
+// whatever it leaves out. Keep the name: UpdateUserAttr explains why a PUT
+// must not rename. The result shares no memory with a.
+func (a *UserAttrResponse) UpdateRequest() UserAttrRequest {
+	editable := a.UserEditable
+	return UserAttrRequest{
+		Name:         a.Name,
+		Desc:         clonePtr(a.Desc),
+		DefaultValue: bytes.Clone(a.DefaultValue),
+		Typ:          clonePtr(a.Typ),
+		UserEditable: &editable,
+	}
 }
 
 // userAttrListResponse wraps the list. GET /users/attr does not answer with a

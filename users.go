@@ -42,7 +42,10 @@ type NewUserRequest struct {
 	Groups     []string `json:"groups,omitempty"`
 	GivenName  *string  `json:"given_name,omitempty"`
 	FamilyName *string  `json:"family_name,omitempty"`
-	TZ         *string  `json:"tz,omitempty"`
+	// PreferredUsername is set at creation only: UpdateUserRequest does not
+	// carry it, and the response reports it under user_values.
+	PreferredUsername *string `json:"preferred_username,omitempty"`
+	TZ                *string `json:"tz,omitempty"`
 	// UserExpires is a Unix timestamp in seconds.
 	UserExpires *int64 `json:"user_expires,omitempty"`
 }
@@ -88,6 +91,22 @@ type UserResponse struct {
 	LastLogin     *int64             `json:"last_login,omitempty"`
 	UserExpires   *int64             `json:"user_expires,omitempty"`
 	UserValues    UserValuesResponse `json:"user_values"`
+
+	// The fields below are reported by Rauthy and not accepted back: no
+	// request type carries them, so an update leaves them alone.
+
+	// AuthProviderID names the upstream auth provider of a federated user.
+	AuthProviderID *string `json:"auth_provider_id,omitempty"`
+	// FederationUID is the user's id at that upstream provider.
+	FederationUID *string `json:"federation_uid,omitempty"`
+	// FailedLoginAttempts is the count of failed logins Rauthy has recorded.
+	FailedLoginAttempts *int64 `json:"failed_login_attempts,omitempty"`
+	// LastFailedLogin is a Unix timestamp in seconds.
+	LastFailedLogin *int64 `json:"last_failed_login,omitempty"`
+	// PasswordExpires is a Unix timestamp in seconds.
+	PasswordExpires *int64  `json:"password_expires,omitempty"`
+	PictureID       *string `json:"picture_id,omitempty"`
+	WebauthnUserID  *string `json:"webauthn_user_id,omitempty"`
 }
 
 func userPath(id string) string {
