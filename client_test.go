@@ -249,8 +249,8 @@ func TestNotFoundIsDetectable(t *testing.T) {
 	if !rauthy.IsNotFound(err) {
 		t.Fatalf("IsNotFound = false for err %v", err)
 	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error %q does not carry Rauthy's message", err)
+	if got, want := err.Error(), "GET /clients/gone: HTTP 404: Client 'gone' not found"; got != want {
+		t.Errorf("error = %q, want %q", got, want)
 	}
 }
 
