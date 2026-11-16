@@ -90,8 +90,9 @@ func TestRetry_ExhaustsBudgetAndReportsLastError(t *testing.T) {
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("err = %v, want *APIError", err)
 	}
-	if apiErr.StatusCode != http.StatusBadGateway || apiErr.Message != "upstream is down" {
-		t.Errorf("err = %v, want the last 502 body", apiErr)
+	if apiErr.StatusCode != http.StatusBadGateway || apiErr.Message != "upstream is down" ||
+		apiErr.ErrorCode != "Internal" {
+		t.Errorf("err = %v, want the last 502 status and error code", apiErr)
 	}
 	if got := calls.Load(); got != 4 {
 		t.Errorf("requests = %d, want the full budget of 4", got)
