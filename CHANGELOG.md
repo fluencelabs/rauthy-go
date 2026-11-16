@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.0](https://github.com/fluencelabs/rauthy-go/compare/v0.1.0...v0.2.0) (2026-11-16)
+
+
+### Features
+
+* **client:** report the Rauthy server version ([2ed61cd](https://github.com/fluencelabs/rauthy-go/commit/2ed61cd57d6d38b3703e319f0d12d10350cb1780))
+* **client:** report the Rauthy server version ([1f0a66c](https://github.com/fluencelabs/rauthy-go/commit/1f0a66c9b7594a42e4702d6075b1e46a30729e36))
+* model the remaining role, group and user fields ([e473a42](https://github.com/fluencelabs/rauthy-go/commit/e473a420d00e8b9b6aeb59c3d2ddc21ed5e78994))
+* **roles,groups,users:** expose meta, read-only user fields and UpdateRequest helpers ([ed05a14](https://github.com/fluencelabs/rauthy-go/commit/ed05a149141dcc996b3c4f69c308c89d4e579ddc))
+
+
+### Bug Fixes
+
+* align client value constraints with Rauthy ([56a2bdd](https://github.com/fluencelabs/rauthy-go/commit/56a2bdd17f1ce949459d7b2fc6fda9fe4ccdeae9))
+* align client value constraints with Rauthy ([15b0b21](https://github.com/fluencelabs/rauthy-go/commit/15b0b215ee547fc86093d69f8e1cd13b77e09c7e))
+* keep rejected values out of APIError ([e7327ee](https://github.com/fluencelabs/rauthy-go/commit/e7327eed15c5b27be99159c8ea1357b9ff49ded0))
+* keep rejected values out of APIError ([7fed14d](https://github.com/fluencelabs/rauthy-go/commit/7fed14de5778fe3111d0e5f94bbf4546d331f94b))
+* model the remaining full-replace request fields ([74b8bb0](https://github.com/fluencelabs/rauthy-go/commit/74b8bb0c7b103aaf67960872dee943fa5dc6aa21))
+* **user-attributes:** never send typ ([019f74d](https://github.com/fluencelabs/rauthy-go/commit/019f74d3febb3301fc8d6795645235128862c598))
+
 ## 0.1.0 (2026-11-15)
 
 
