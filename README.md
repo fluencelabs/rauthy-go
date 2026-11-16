@@ -67,6 +67,12 @@ build the body with `GetClient(...).UpdateRequest()` and change only what the
 update is about. Scopes, roles, groups and user attributes work the same way,
 each response type carrying an `UpdateRequest()`.
 
+`RoleRequest`, `RoleResponse`, `GroupRequest` and `GroupResponse` carry `Meta`,
+a `json.RawMessage`, since the release after v0.1.0. That is a source
+incompatibility for some callers: the four structs are no longer comparable
+with `==` and cannot be map keys, and a positional (unkeyed) literal of them
+no longer compiles. Keyed literals are unaffected.
+
 ### Validation
 
 `validation.go` carries the patterns, bounds and enums Rauthy checks on OIDC

@@ -19,7 +19,9 @@ type RoleResponse struct {
 // UpdateRequest returns a PUT /roles/{id} body that keeps every setting of r.
 // The PUT replaces the role wholesale, so start from this and change only what
 // the update is about: a body assembled field by field resets whatever it
-// leaves out, meta included. The result shares no memory with r.
+// leaves out, meta included: on a live Rauthy 0.36.2 a role PUT without meta
+// clears it, and a PUT built from this keeps it. The result shares no memory
+// with r.
 func (r *RoleResponse) UpdateRequest() RoleRequest {
 	return RoleRequest{Role: r.Name, Meta: bytes.Clone(r.Meta)}
 }
@@ -28,7 +30,7 @@ func (r *RoleResponse) UpdateRequest() RoleRequest {
 type RoleRequest struct {
 	Role string `json:"role"`
 	// Meta is free-form JSON attached to the role. Left empty it is not sent,
-	// which on a PUT clears what the role carried.
+	// and on a live 0.36.2 a PUT without it clears what the role carried.
 	Meta json.RawMessage `json:"meta,omitempty"`
 }
 

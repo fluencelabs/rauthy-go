@@ -28,7 +28,8 @@ func (g *GroupResponse) UpdateRequest() GroupRequest {
 type GroupRequest struct {
 	Group string `json:"group"`
 	// Meta is free-form JSON attached to the group. Left empty it is not sent,
-	// which on a PUT clears what the group carried.
+	// which on a PUT clears what the group carried, as it does for a role (a
+	// role PUT without meta clears it on a live 0.36.2).
 	Meta json.RawMessage `json:"meta,omitempty"`
 }
 
