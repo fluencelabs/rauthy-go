@@ -100,9 +100,11 @@ type ScopeRequest struct {
 // until the cache expires (up to 12 hours), although it exists. Every scope
 // call, reads included, is therefore serialised through Client.scopeMu, and
 // user attribute writes, which edit scope mappings and empty that cache, take
-// it as well. The lock covers one Client only, and a call abandoned on a
-// timeout or cancellation releases it while the server may still run it, as
-// for the user attributes.
+// it as well, and so does a client update, which checks its scopes against
+// that list. The lock covers one Client only: other Clients, the Admin UI and
+// Rauthy's own logins and token requests refill the cache too and are not
+// ordered by it. A call abandoned on a timeout or cancellation releases the
+// lock while the server may still run it, as for the user attributes.
 func scopePath(id string) string {
 	return "/scopes/" + url.PathEscape(id)
 }

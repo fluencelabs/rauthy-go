@@ -36,10 +36,10 @@ func TestScopeCallsAreSerialised(t *testing.T) {
 	})
 
 	var wg sync.WaitGroup
-	for i := range 14 {
+	for i := range 16 {
 		wg.Go(func() {
 			var err error
-			switch i % 7 {
+			switch i % 8 {
 			case 0:
 				_, err = c.CreateScope(context.Background(), rauthy.ScopeRequest{Scope: "read"})
 			case 1:
@@ -52,6 +52,8 @@ func TestScopeCallsAreSerialised(t *testing.T) {
 				_, err = c.CreateUserAttr(context.Background(), rauthy.UserAttrRequest{Name: "department"})
 			case 5:
 				err = c.UpdateUserAttr(context.Background(), "department", rauthy.UserAttrRequest{Name: "department"})
+			case 6:
+				_, err = c.UpdateClient(context.Background(), "app", rauthy.UpdateClientRequest{ID: "app"})
 			default:
 				err = c.DeleteUserAttr(context.Background(), "department")
 			}

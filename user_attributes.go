@@ -96,8 +96,7 @@ const userAttrPathBase = "/users/attr"
 // Reads are serialised too: a read that finds the cache empty stores the list
 // it selected, and Rauthy 0.37.2 empties the cache on every create, so a read
 // started before a create could store a list without the new attribute. A
-// write also
-// takes Client.scopeMu, after userAttrMu: Rauthy edits the scopes' attribute
+// write also takes Client.scopeMu, after userAttrMu: Rauthy edits the scopes' attribute
 // mappings and empties the scope cache on it, which a concurrent scope call
 // would otherwise overwrite with a stale list (see the note above scopePath).
 //
