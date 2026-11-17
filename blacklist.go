@@ -102,5 +102,8 @@ func sameIP(a, b string) bool {
 // therefore no 404 to distinguish "removed" from "was not there", which suits a
 // declarative delete but makes this useless as an existence check.
 func (c *Client) DeleteBlacklistedIP(ctx context.Context, ip string) error {
+	if addr, err := netip.ParseAddr(ip); err == nil {
+		ip = addr.String()
+	}
 	return c.do(ctx, http.MethodDelete, blacklistPath(ip), nil, nil)
 }

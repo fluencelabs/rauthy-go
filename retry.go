@@ -80,7 +80,8 @@ func (c *Client) send(
 		switch {
 		case err != nil:
 			lastErr = err
-		case resp.status >= 200 && resp.status < 300:
+		case resp.status >= 200 && resp.status < 300,
+			method == http.MethodGet && strings.HasPrefix(path, "/providers/") && strings.HasSuffix(path, "/delete_safe") && resp.status == http.StatusNotAcceptable:
 			return resp, nil
 		default:
 			status, retryAfter = resp.status, resp.retryAfter
