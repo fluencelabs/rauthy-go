@@ -93,12 +93,22 @@ type ScopeRequest struct {
 	ClaimsAtRoot      bool     `json:"claims_at_root"`
 }
 
+// Rauthy keeps the scopes as one cached list and rewrites it on every create,
+// update and delete without locking: concurrent writes lose one of them from
+// the cache, and the lost scope reads as missing until the cache expires,
+// although it exists. Writes are therefore serialised through Client.scopeMu.
+// Like the user attributes, this covers one Client only.
 func scopePath(id string) string {
 	return "/scopes/" + url.PathEscape(id)
 }
 
 // CreateScope issues POST /scopes. Requires the Scopes:Create right.
 func (c *Client) CreateScope(ctx context.Context, req ScopeRequest) (*ScopeResponse, error) {
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
+
 	var out ScopeResponse
 	if err := c.do(ctx, http.MethodPost, "/scopes", req, &out); err != nil {
 		return nil, err
@@ -149,6 +159,11 @@ func (c *Client) GetScopeByName(ctx context.Context, name string) (*ScopeRespons
 // with ScopeResponse.UpdateRequest from a GetScope result and change only what
 // the update is about. Requires Scopes:Update.
 func (c *Client) UpdateScope(ctx context.Context, id string, req ScopeRequest) (*ScopeResponse, error) {
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
+
 	var out ScopeResponse
 	if err := c.do(ctx, http.MethodPut, scopePath(id), req, &out); err != nil {
 		return nil, err
@@ -158,5 +173,10 @@ func (c *Client) UpdateScope(ctx context.Context, id string, req ScopeRequest) (
 
 // DeleteScope issues DELETE /scopes/{id}. Requires Scopes:Delete.
 func (c *Client) DeleteScope(ctx context.Context, id string) error {
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return err
+	}
+	defer c.scopeMu.unlock()
+
 	return c.do(ctx, http.MethodDelete, scopePath(id), nil, nil)
 }

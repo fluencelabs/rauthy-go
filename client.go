@@ -32,7 +32,12 @@ type Client struct {
 	// Rauthy stores as one cached list and rewrites without locking. See the
 	// note above userAttrPathBase in user_attributes.go for what happens
 	// without it.
-	userAttrMu chan struct{}
+	userAttrMu writeLock
+	// scopeMu serialises writes to the scopes, which Rauthy keeps as one
+	// cached list: it reads the list, changes it and stores it back, so two
+	// writes at once lose one of them from the cache until it expires, and the
+	// scope then reads as missing. See the note above scopePath.
+	scopeMu writeLock
 	// retry bounds how hard every request tries before giving up. See retry.go.
 	retry retryPolicy
 }
@@ -107,7 +112,8 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 
 	c := &Client{
 		baseURL:    NewSecret(base),
-		userAttrMu: make(chan struct{}, 1),
+		userAttrMu: newWriteLock(),
+		scopeMu:    newWriteLock(),
 		apiKey:     NewSecret(apiKey),
 		httpClient: &http.Client{Timeout: defaultTimeout, CheckRedirect: noRedirects},
 		retry: retryPolicy{

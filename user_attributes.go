@@ -106,10 +106,10 @@ func userAttrPath(name string) string {
 // CreateUserAttr issues POST /users/attr. Requires the UserAttributes:Create
 // right.
 func (c *Client) CreateUserAttr(ctx context.Context, req UserAttrRequest) (*UserAttrResponse, error) {
-	if err := c.lockUserAttrs(ctx); err != nil {
+	if err := c.userAttrMu.lock(ctx); err != nil {
 		return nil, err
 	}
-	defer c.unlockUserAttrs()
+	defer c.userAttrMu.unlock()
 
 	var out UserAttrResponse
 	if err := c.do(ctx, http.MethodPost, userAttrPathBase, req, &out); err != nil {
@@ -159,10 +159,10 @@ func (c *Client) GetUserAttr(ctx context.Context, name string) (*UserAttrRespons
 // does send one; it is discarded either way, and the caller reads the attribute
 // back rather than trusting it.
 func (c *Client) UpdateUserAttr(ctx context.Context, name string, req UserAttrRequest) error {
-	if err := c.lockUserAttrs(ctx); err != nil {
+	if err := c.userAttrMu.lock(ctx); err != nil {
 		return err
 	}
-	defer c.unlockUserAttrs()
+	defer c.userAttrMu.unlock()
 
 	return c.do(ctx, http.MethodPut, userAttrPath(name), req, nil)
 }
@@ -170,19 +170,26 @@ func (c *Client) UpdateUserAttr(ctx context.Context, name string, req UserAttrRe
 // DeleteUserAttr issues DELETE /users/attr/{name}. Requires
 // UserAttributes:Delete.
 func (c *Client) DeleteUserAttr(ctx context.Context, name string) error {
-	if err := c.lockUserAttrs(ctx); err != nil {
+	if err := c.userAttrMu.lock(ctx); err != nil {
 		return err
 	}
-	defer c.unlockUserAttrs()
+	defer c.userAttrMu.unlock()
 
 	return c.do(ctx, http.MethodDelete, userAttrPath(name), nil, nil)
 }
 
-func (c *Client) lockUserAttrs(ctx context.Context) error {
+// writeLock is a context-aware mutex for a list Rauthy keeps as one cached
+// value and rewrites without locking. A caller waiting for it gives up when its
+// context ends.
+type writeLock chan struct{}
+
+func newWriteLock() writeLock { return make(writeLock, 1) }
+
+func (l writeLock) lock(ctx context.Context) error {
 	select {
-	case c.userAttrMu <- struct{}{}:
+	case l <- struct{}{}:
 		if err := ctx.Err(); err != nil {
-			c.unlockUserAttrs()
+			l.unlock()
 			return err
 		}
 		return nil
@@ -191,4 +198,4 @@ func (c *Client) lockUserAttrs(ctx context.Context) error {
 	}
 }
 
-func (c *Client) unlockUserAttrs() { <-c.userAttrMu }
+func (l writeLock) unlock() { <-l }
