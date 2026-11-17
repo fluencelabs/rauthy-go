@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/fluencelabs/rauthy-go/compare/v0.2.0...v0.3.0) (2026-11-17)
+
+
+### Bug Fixes
+
+* **contract:** decode linked users on 406 and canonicalize IP deletion ([7bb32d7](https://github.com/fluencelabs/rauthy-go/commit/7bb32d7ac9ce09b49b14ea4f1122c0ba31f69528))
+* keep the base URL out of transport errors ([13addde](https://github.com/fluencelabs/rauthy-go/commit/13addde044cf3adad0974d9bd5b0e4ce01710965))
+* name only the scheme and host of a refused redirect ([bfacbff](https://github.com/fluencelabs/rauthy-go/commit/bfacbff0a94597c19be68696733e8b447ccc5b56))
+* redact credentials in formatting, stop replaying password changes, decode 406 linked users ([f3db97b](https://github.com/fluencelabs/rauthy-go/commit/f3db97b939424e44b0dad3c0942141109859ec37))
+* **retry:** avoid replaying password changes and honor queued deadlines ([e2df34e](https://github.com/fluencelabs/rauthy-go/commit/e2df34e1f28268388b967f10041392230596b1d1))
+* return the base URL as a Secret ([ec93f66](https://github.com/fluencelabs/rauthy-go/commit/ec93f662aeea2f3f1b269799052edc2301609f69))
+* **security:** redact credential formatting and URL configuration errors ([abf3b7d](https://github.com/fluencelabs/rauthy-go/commit/abf3b7dad5bcbfea81babecc07b3f6fbfc15eef6))
+* **security:** store credentials as indirect redacted secrets ([12543bc](https://github.com/fluencelabs/rauthy-go/commit/12543bc9e2326fc70d1ede9c7626ba5832a2d4c4))
+
+
+### Miscellaneous Chores
+
+* release 0.3.0 ([575371d](https://github.com/fluencelabs/rauthy-go/commit/575371d4087ea4bee8cfd2137c7eae03ac13042c))
+
 ## [0.2.0](https://github.com/fluencelabs/rauthy-go/compare/v0.1.0...v0.2.0) (2026-11-16)
 
 
