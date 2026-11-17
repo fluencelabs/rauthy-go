@@ -13,7 +13,7 @@ import (
 func TestSecretFormatting(t *testing.T) {
 	t.Parallel()
 	secret := "SYNTHETIC_CREDENTIAL_42"
-	scim := &rauthy.ScimClientRequestResponse{BearerToken: secret}
+	scim := &rauthy.ScimClientRequestResponse{BearerToken: rauthy.NewSecret(secret)}
 	client, err := rauthy.New("https://auth.example.com", secret)
 	if err != nil {
 		t.Fatal(err)
@@ -23,19 +23,20 @@ func TestSecretFormatting(t *testing.T) {
 		*scim, scim,
 		rauthy.ClientResponse{Scim: scim},
 		rauthy.UpdateClientRequest{Scim: scim},
-		rauthy.ClientSecretResponse{Secret: &secret},
-		rauthy.PamHostSecretResponse{Secret: secret},
-		rauthy.AuthProviderRequest{ClientSecret: &secret},
-		rauthy.AuthProviderResponse{ClientSecret: &secret},
-		rauthy.UpdateUserRequest{Password: &secret},
+		rauthy.ClientSecretResponse{Secret: new(rauthy.NewSecret(secret))},
+		rauthy.PamHostSecretResponse{Secret: rauthy.NewSecret(secret)},
+		rauthy.AuthProviderRequest{ClientSecret: new(rauthy.NewSecret(secret))},
+		rauthy.AuthProviderResponse{ClientSecret: new(rauthy.NewSecret(secret))},
+		rauthy.UpdateUserRequest{Password: new(rauthy.NewSecret(secret))},
 	}
 	for _, value := range values {
 		ptr := reflect.New(reflect.TypeOf(value))
 		ptr.Elem().Set(reflect.ValueOf(value))
-		for _, format := range []string{"%v", "%+v", "%#v"} {
-			if strings.Contains(fmt.Sprintf(format, value), secret) ||
-				strings.Contains(fmt.Sprintf(format, ptr.Interface()), secret) {
-				t.Errorf("%T leaks credential with %s", value, format)
+		for _, wrapped := range []any{value, ptr.Interface(), struct{ Value any }{value}, struct{ value any }{value}} {
+			for _, format := range []string{"%v", "%+v", "%#v", "%s"} {
+				if strings.Contains(fmt.Sprintf(format, wrapped), secret) {
+					t.Errorf("%T leaks credential with %s", value, format)
+				}
 			}
 		}
 		// Client has no JSON wire representation. Every credential-bearing DTO must

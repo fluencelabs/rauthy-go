@@ -24,9 +24,9 @@ const APIBasePath = "/auth/v1"
 const defaultTimeout = 30 * time.Second
 
 // Client talks to the Rauthy admin API using an API key.
-type Client struct { //nolint:recvcheck // Format must also redact non-pointer values.
-	baseURL    string
-	apiKey     string
+type Client struct {
+	baseURL    Secret
+	apiKey     Secret
 	httpClient *http.Client
 	// userAttrMu is a context-aware semaphore that serialises writes to the user attribute definitions, which
 	// Rauthy stores as one cached list and rewrites without locking. See the
@@ -105,9 +105,9 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 	}
 
 	c := &Client{
-		baseURL:    base,
+		baseURL:    NewSecret(base),
 		userAttrMu: make(chan struct{}, 1),
-		apiKey:     apiKey,
+		apiKey:     NewSecret(apiKey),
 		httpClient: &http.Client{Timeout: defaultTimeout, CheckRedirect: noRedirects},
 		retry: retryPolicy{
 			maxAttempts: defaultMaxAttempts,
@@ -133,7 +133,7 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 // BaseURL returns the API root, including the /auth/v1 base path.
-func (c *Client) BaseURL() string { return c.baseURL }
+func (c *Client) BaseURL() string { return c.baseURL.Reveal() }
 
 // do executes a request against path (relative to the API root), sending body
 // as JSON when non-nil and decoding the response into out when non-nil.
@@ -159,12 +159,12 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 // `<name>$<secret>` line with no envelope around it. Feeding that to do() would
 // fail in json.Unmarshal, so it gets its own path rather than a special case
 // inside the JSON one.
-func (c *Client) doText(ctx context.Context, method, path string, body any) (string, error) {
+func (c *Client) doText(ctx context.Context, method, path string, body any) (Secret, error) {
 	raw, err := c.doRaw(ctx, method, path, body, "text/plain")
 	if err != nil {
-		return "", err
+		return Secret{}, err
 	}
-	return string(bytes.TrimSpace(raw)), nil
+	return NewSecret(string(bytes.TrimSpace(raw))), nil
 }
 
 // doRaw sends body as JSON and returns the response body untouched. accept is
@@ -197,12 +197,12 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 	if err := checkPath(path); err != nil {
 		return nil, fmt.Errorf("build %s %s: %w", method, path, err)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL.Reveal()+path, body)
 	if err != nil {
 		return nil, fmt.Errorf("build %s %s: %w", method, path, err)
 	}
 	// Rauthy expects the key as `API-Key <name>$<secret>`.
-	req.Header.Set("Authorization", "API-Key "+c.apiKey)
+	req.Header.Set("Authorization", "API-Key "+c.apiKey.Reveal())
 	return req, nil
 }
 

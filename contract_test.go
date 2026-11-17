@@ -364,7 +364,7 @@ func TestContract_AuthProviderRequest(t *testing.T) {
 		UserinfoEndpoint:      "https://idp.example.com/userinfo",
 		JwksEndpoint:          &jwks,
 		ClientID:              "rauthy",
-		ClientSecret:          &secret,
+		ClientSecret:          new(rauthy.NewSecret(secret)),
 		Scope:                 "email openid profile",
 		UsePKCE:               true,
 		ClientSecretBasic:     true,

@@ -22,7 +22,7 @@ func TestCreateAuthProviderRejectedSecret(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatal(err)
 		}
-		if req.ClientSecret == nil || *req.ClientSecret != secret {
+		if req.ClientSecret == nil || req.ClientSecret.Reveal() != secret {
 			t.Error("request lost client_secret")
 		}
 		w.WriteHeader(http.StatusBadRequest)
@@ -34,7 +34,7 @@ func TestCreateAuthProviderRejectedSecret(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	_, err := c.CreateAuthProvider(t.Context(), rauthy.AuthProviderRequest{ClientSecret: &secret})
+	_, err := c.CreateAuthProvider(t.Context(), rauthy.AuthProviderRequest{ClientSecret: new(rauthy.NewSecret(secret))})
 	var api *rauthy.APIError
 	if !errors.As(err, &api) {
 		t.Fatalf("expected APIError, got %v", err)

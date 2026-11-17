@@ -49,7 +49,7 @@ func ExampleNew() {
 		fmt.Println("read client secret:", err)
 		return
 	}
-	fmt.Println(created.ID, *secret.Secret)
+	fmt.Println(created.ID, secret.Secret.Reveal())
 	// Output: example-app s3cr3t
 }
 

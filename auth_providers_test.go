@@ -47,7 +47,7 @@ func TestCreateAuthProvider_PostsToProvidersCreate(t *testing.T) {
 		TokenEndpoint:         "https://idp.example.com/token",
 		UserinfoEndpoint:      "https://idp.example.com/userinfo",
 		ClientID:              "rauthy",
-		ClientSecret:          &secret,
+		ClientSecret:          new(rauthy.NewSecret(secret)),
 		Scope:                 "openid profile",
 	})
 	if err != nil {

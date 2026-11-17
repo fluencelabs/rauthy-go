@@ -93,7 +93,7 @@ func kindMatches(jsonType string, t reflect.Type) bool {
 	case "":
 		return isRaw || t.Kind() == reflect.Interface
 	case "string":
-		return t.Kind() == reflect.String
+		return t.Kind() == reflect.String || t == reflect.TypeFor[rauthy.Secret]()
 	case "boolean":
 		return t.Kind() == reflect.Bool
 	case "integer":

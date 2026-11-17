@@ -15,7 +15,7 @@ import (
 
 func TestPasswordUpdateIsNotReplayed(t *testing.T) {
 	t.Parallel()
-	for _, password := range []*string{nil, new("SYNTHETIC_PASSWORD")} {
+	for _, password := range []*rauthy.Secret{nil, new(rauthy.NewSecret("SYNTHETIC_PASSWORD"))} {
 		t.Run(strconv.FormatBool(password != nil), func(t *testing.T) {
 			t.Parallel()
 			var calls atomic.Int32

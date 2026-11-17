@@ -143,7 +143,7 @@ func TestGetClientSecret_UsesPOST(t *testing.T) {
 	if gotMethod != http.MethodPost || gotPath != "/auth/v1/clients/app/secret" {
 		t.Errorf("got %s %s, want POST /auth/v1/clients/app/secret", gotMethod, gotPath)
 	}
-	if got.Secret == nil || *got.Secret != "s3cr3t" {
+	if got.Secret == nil || got.Secret.Reveal() != "s3cr3t" {
 		t.Errorf("Secret = %v, want s3cr3t", got.Secret)
 	}
 }
@@ -161,7 +161,7 @@ func TestGetClientSecret_PublicClientHasNoSecret(t *testing.T) {
 		t.Fatalf("GetClientSecret: %v", err)
 	}
 	if got.Secret != nil {
-		t.Errorf("Secret = %v, want nil for a public client", *got.Secret)
+		t.Errorf("Secret = %v, want nil for a public client", got.Secret.Reveal())
 	}
 }
 
@@ -203,7 +203,7 @@ func TestRotateClientSecret_SendsCacheCurrentHours(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RotateClientSecret: %v", err)
 	}
-	if got.ID != "app" || !got.Confidential || got.Secret == nil || *got.Secret != "new" {
+	if got.ID != "app" || !got.Confidential || got.Secret == nil || got.Secret.Reveal() != "new" {
 		t.Errorf("rotation = %+v", got)
 	}
 	if gotMethod != http.MethodPut {
@@ -229,7 +229,7 @@ func TestRotateClientSecret_OmitsCacheCurrentHoursWhenUnset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RotateClientSecret: %v", err)
 	}
-	if got.ID != "app" || !got.Confidential || got.Secret == nil || *got.Secret != "new" {
+	if got.ID != "app" || !got.Confidential || got.Secret == nil || got.Secret.Reveal() != "new" {
 		t.Errorf("rotation = %+v", got)
 	}
 	if _, ok := gotBody["cache_current_hours"]; ok {

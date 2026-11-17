@@ -159,7 +159,7 @@ func TestClientResponse_UpdateRequestSharesNoMemory(t *testing.T) {
 	req.AllowedResources[0] = "changed"
 	req.Claims[0] = ' '
 	*req.Name = "changed"
-	req.Scim.BearerToken = "changed"
+	req.Scim.BearerToken = rauthy.NewSecret("changed")
 	*req.Scim.GroupSyncPrefix = "changed"
 
 	again, _ := decodeFullClient(t)

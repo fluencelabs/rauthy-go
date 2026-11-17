@@ -186,7 +186,7 @@ func TestGetPamHostSecret_PostsAndNeverRotates(t *testing.T) {
 	if gotMethod != http.MethodPost || gotPath != "/auth/v1/pam/hosts/h1/secret" {
 		t.Errorf("got %s %s, want POST /auth/v1/pam/hosts/h1/secret", gotMethod, gotPath)
 	}
-	if got.Secret != "s3cr3t" {
+	if got.Secret.Reveal() != "s3cr3t" {
 		t.Errorf("got %+v", got)
 	}
 }

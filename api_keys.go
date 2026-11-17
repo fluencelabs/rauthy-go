@@ -66,11 +66,12 @@ func apiKeyPath(name string) string {
 // The response is `text/plain`, not JSON: the body is that one line and nothing
 // else, which is why this goes through doText. This is the only moment the
 // secret exists outside Rauthy's database; a caller that drops it cannot ask
-// for it back and must rotate instead. Requires ApiKeys:Create.
-func (c *Client) CreateAPIKey(ctx context.Context, req APIKeyRequest) (string, error) {
+// for it back and must rotate instead. Use Reveal to obtain the credential
+// for authentication. Requires ApiKeys:Create.
+func (c *Client) CreateAPIKey(ctx context.Context, req APIKeyRequest) (Secret, error) {
 	secret, err := c.doText(ctx, http.MethodPost, "/api_keys", req)
 	if err != nil {
-		return "", annotateMissingRight(err, "ApiKeys", "Create")
+		return Secret{}, annotateMissingRight(err, "ApiKeys", "Create")
 	}
 	return secret, nil
 }
@@ -122,11 +123,12 @@ func (c *Client) UpdateAPIKey(ctx context.Context, name string, req APIKeyReques
 //
 // The old secret stops working the moment this returns; there is no overlap
 // window of the kind an OIDC client secret gets from cache_current_hours.
+// Use Reveal to obtain the credential for authentication.
 // Requires ApiKeys:Update.
-func (c *Client) RotateAPIKeySecret(ctx context.Context, name string) (string, error) {
+func (c *Client) RotateAPIKeySecret(ctx context.Context, name string) (Secret, error) {
 	secret, err := c.doText(ctx, http.MethodPut, apiKeyPath(name)+"/secret", nil)
 	if err != nil {
-		return "", annotateMissingRight(err, "ApiKeys", "Update")
+		return Secret{}, annotateMissingRight(err, "ApiKeys", "Update")
 	}
 	return secret, nil
 }

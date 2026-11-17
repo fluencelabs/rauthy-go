@@ -28,8 +28,8 @@ type NewClientRequest struct {
 
 // ScimClientRequestResponse is the SCIM sub-object, shared by the update
 // request and the client response.
-type ScimClientRequestResponse struct { //nolint:recvcheck // Format must also redact non-pointer values.
-	BearerToken     string  `json:"bearer_token"`
+type ScimClientRequestResponse struct {
+	BearerToken     Secret  `json:"bearer_token"`
 	BaseURI         string  `json:"base_uri"`
 	SyncGroups      bool    `json:"sync_groups"`
 	GroupSyncPrefix *string `json:"group_sync_prefix,omitempty"`
@@ -154,6 +154,7 @@ func (s *ScimClientRequestResponse) clone() *ScimClientRequestResponse {
 		return nil
 	}
 	out := *s
+	out.BearerToken = NewSecret(s.BearerToken.Reveal())
 	out.GroupSyncPrefix = clonePtr(s.GroupSyncPrefix)
 	return &out
 }
@@ -177,5 +178,5 @@ type ClientSecretRequest struct {
 type ClientSecretResponse struct {
 	ID           string  `json:"id"`
 	Confidential bool    `json:"confidential"`
-	Secret       *string `json:"secret,omitempty"`
+	Secret       *Secret `json:"secret,omitempty"`
 }

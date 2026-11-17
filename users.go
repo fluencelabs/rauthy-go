@@ -70,7 +70,7 @@ type UpdateUserRequest struct {
 	GivenName     *string     `json:"given_name"`
 	FamilyName    *string     `json:"family_name"`
 	Language      *string     `json:"language,omitempty"`
-	Password      *string     `json:"password,omitempty"`
+	Password      *Secret     `json:"password,omitempty"`
 	UserExpires   *int64      `json:"user_expires"`
 	UserValues    *UserValues `json:"user_values,omitempty"`
 }
