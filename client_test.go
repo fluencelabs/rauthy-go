@@ -43,7 +43,7 @@ func TestNew_AppendsAPIBasePath(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New(%q): %v", in, err)
 		}
-		if got := c.BaseURL(); got != want {
+		if got := c.BaseURL().Reveal(); got != want {
 			t.Errorf("New(%q).BaseURL() = %q, want %q", in, got, want)
 		}
 	}

@@ -132,8 +132,9 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 // wherever it points; the 3xx is reported as an API error instead.
 func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-// BaseURL returns the API root, including the /auth/v1 base path.
-func (c *Client) BaseURL() string { return c.baseURL.Reveal() }
+// BaseURL returns the API root, including the /auth/v1 base path. It is a
+// Secret: a URL can carry a credential, so the caller reveals it on purpose.
+func (c *Client) BaseURL() Secret { return c.baseURL }
 
 // do executes a request against path (relative to the API root), sending body
 // as JSON when non-nil and decoding the response into out when non-nil.
