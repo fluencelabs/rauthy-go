@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.2](https://github.com/fluencelabs/rauthy-go/compare/v0.3.1...v0.3.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* never retry a PUT after HTTP 500 ([1d380bb](https://github.com/fluencelabs/rauthy-go/commit/1d380bb3132cd46160f64688ae93d04cbb7cb13e))
+* never retry PUT after HTTP 500 ([f3a8e71](https://github.com/fluencelabs/rauthy-go/commit/f3a8e71e5aaee80e8aa634e2f6c86ff237d4a21d))
+* retain response status when reading body fails ([cc5ea61](https://github.com/fluencelabs/rauthy-go/commit/cc5ea618a05a21c8436be16b58160f739aab996d))
+
 ## [0.3.1](https://github.com/fluencelabs/rauthy-go/compare/v0.3.0...v0.3.1) (2026-11-17)
 
 
