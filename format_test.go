@@ -30,15 +30,7 @@ func TestSecretFormatting(t *testing.T) {
 		rauthy.UpdateUserRequest{Password: new(rauthy.NewSecret(secret))},
 	}
 	for _, value := range values {
-		ptr := reflect.New(reflect.TypeOf(value))
-		ptr.Elem().Set(reflect.ValueOf(value))
-		for _, wrapped := range []any{value, ptr.Interface(), struct{ Value any }{value}, struct{ value any }{value}} {
-			for _, format := range []string{"%v", "%+v", "%#v", "%s"} {
-				if strings.Contains(fmt.Sprintf(format, wrapped), secret) {
-					t.Errorf("%T leaks credential with %s", value, format)
-				}
-			}
-		}
+		assertSecretFormatting(t, value, secret)
 		// Client has no JSON wire representation. Every credential-bearing DTO must
 		// still carry the original credential when marshalled.
 		if _, ok := value.(rauthy.Client); ok {

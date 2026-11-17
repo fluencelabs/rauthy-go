@@ -5,8 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 
 	rauthy "github.com/fluencelabs/rauthy-go"
@@ -165,5 +170,39 @@ func TestTransportErrorOmitsBaseURL(t *testing.T) {
 	}
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("error %v lost its cause", err)
+	}
+}
+
+// Every kind of transport failure keeps the base URL out of the error and
+// keeps its cause.
+func TestTransportFailuresOmitBaseURL(t *testing.T) {
+	t.Parallel()
+	const token = "SYNTHETICRESETTOKENSYNTHETICRESETTOKEN"
+	refused := &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}
+	dns := &net.DNSError{Err: "no such host", Name: "auth.invalid", IsNotFound: true}
+	timeout := &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}
+	for name, cause := range map[string]error{
+		"eof": io.ErrUnexpectedEOF, "refused": refused, "dns": dns, "timeout": timeout,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			transport := retryRoundTripper(func(*http.Request) (*http.Response, error) { return nil, cause })
+			c, err := rauthy.New("https://auth.invalid/auth/v1/users/u1/reset/"+token, "key$secret",
+				rauthy.WithHTTPClient(&http.Client{Transport: transport}),
+				rauthy.WithRetryPolicy(1, 0, 0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = c.GetClient(t.Context(), "app")
+			if err == nil {
+				t.Fatal("GetClient with a failing transport succeeded")
+			}
+			if strings.Contains(err.Error(), token) {
+				t.Fatalf("transport error repeats the base URL: %v", err)
+			}
+			if !errors.Is(err, cause) {
+				t.Errorf("error %v lost its cause", err)
+			}
+		})
 	}
 }
