@@ -141,6 +141,9 @@ func TestCreateGroup_SendsGroupField(t *testing.T) {
 
 	var gotBody map[string]any
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/auth/v1/groups" {
+			t.Errorf("got %s %s, want POST /auth/v1/groups", r.Method, r.URL.Path)
+		}
 		raw, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(raw, &gotBody)
 		w.Header().Set("Content-Type", "application/json")
