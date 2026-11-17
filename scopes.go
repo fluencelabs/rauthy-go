@@ -102,8 +102,8 @@ type ScopeRequest struct {
 // user attribute writes, which edit scope mappings and empty that cache, take
 // it as well, and so does a client update, which checks its scopes against
 // that list. The lock covers one Client only: other Clients, the Admin UI and
-// Rauthy's own logins and token requests refill the cache too and are not
-// ordered by it. A call abandoned on a timeout or cancellation releases the
+// Rauthy's own logins, token requests and background SCIM syncs refill the
+// cache too and are not ordered by it. A call abandoned on a timeout or cancellation releases the
 // lock while the server may still run it, as for the user attributes.
 func scopePath(id string) string {
 	return "/scopes/" + url.PathEscape(id)
