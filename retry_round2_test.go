@@ -298,3 +298,46 @@ func TestGetDeleteRetryOnInternalServerError(t *testing.T) {
 		})
 	}
 }
+
+func TestRetryTruncatedServerError(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		method  string
+		status  int
+		want    int32
+		wantErr error
+	}{
+		{http.MethodPut, http.StatusInternalServerError, 1, io.ErrUnexpectedEOF},
+		{http.MethodGet, http.StatusInternalServerError, 2, nil},
+		{http.MethodPut, http.StatusGatewayTimeout, 2, nil},
+	} {
+		t.Run(tc.method+"/"+strconv.Itoa(tc.status), func(t *testing.T) {
+			t.Parallel()
+			var seen atomic.Int32
+			c, calls := newRetryClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != tc.method {
+					t.Errorf("method=%s, want %s", r.Method, tc.method)
+				}
+				if seen.Add(1) == 1 {
+					w.Header().Set("Content-Length", "100")
+					w.WriteHeader(tc.status)
+					_, _ = io.WriteString(w, `{"error":`)
+					return
+				}
+				_, _ = io.WriteString(w, `{"id":"x"}`)
+			})
+			var err error
+			if tc.method == http.MethodPut {
+				_, err = c.UpdateClient(t.Context(), "x", rauthy.UpdateClientRequest{ID: "x"})
+			} else {
+				_, err = c.GetClient(t.Context(), "x")
+			}
+			if !errors.Is(err, tc.wantErr) {
+				t.Errorf("err=%v, want %v", err, tc.wantErr)
+			}
+			if got := calls.Load(); got != tc.want {
+				t.Errorf("requests=%d, want %d", got, tc.want)
+			}
+		})
+	}
+}

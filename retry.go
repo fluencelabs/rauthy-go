@@ -41,8 +41,8 @@ type retryPolicy struct {
 	maxDelay    time.Duration
 }
 
-// rawResponse is a response with its body already drained, so that a retry
-// never has to reason about a half-read connection.
+// rawResponse keeps the received status and headers even if reading the body
+// fails, so retry decisions can use both the status and the read error.
 type rawResponse struct {
 	body        []byte
 	contentType string
@@ -88,6 +88,9 @@ func (c *Client) send(
 		resp, err := c.attempt(ctx, method, path, body, headers)
 		status := 0
 		retryAfter := ""
+		if resp != nil {
+			status, retryAfter = resp.status, resp.retryAfter
+		}
 		switch {
 		case err != nil:
 			lastErr = err
@@ -95,7 +98,6 @@ func (c *Client) send(
 			method == http.MethodGet && strings.HasPrefix(path, "/providers/") && strings.HasSuffix(path, "/delete_safe") && resp.status == http.StatusNotAcceptable:
 			return resp, nil
 		default:
-			status, retryAfter = resp.status, resp.retryAfter
 			apiErr := newAPIError(method, path, resp.status, resp.body)
 			if resp.redirect != "" {
 				apiErr.Message = resp.redirect
@@ -154,18 +156,17 @@ func (c *Client) attempt(
 	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		// A truncated read is a transport failure like any other, and is
-		// reported as one so the retry rules see it that way.
-		return nil, fmt.Errorf("read %s %s response: %w", method, path, err)
-	}
-	return &rawResponse{
+	result := &rawResponse{
 		body:        raw,
 		contentType: resp.Header.Get("Content-Type"),
 		status:      resp.StatusCode,
 		retryAfter:  resp.Header.Get("Retry-After"),
 		redirect:    redirectMessage(resp.StatusCode, req.URL, resp.Header.Get("Location")),
-	}, nil
+	}
+	if err != nil {
+		return result, fmt.Errorf("read %s %s response: %w", method, path, err)
+	}
+	return result, nil
 }
 
 // retryable decides whether the failure just seen may be tried again. status is
