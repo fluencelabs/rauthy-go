@@ -41,8 +41,8 @@ type retryPolicy struct {
 	maxDelay    time.Duration
 }
 
-// rawResponse is a response with its body already drained, so that a retry
-// never has to reason about a half-read connection.
+// rawResponse keeps the received status and headers even if reading the body
+// fails, so retry decisions can use both the status and the read error.
 type rawResponse struct {
 	body        []byte
 	contentType string
@@ -88,6 +88,9 @@ func (c *Client) send(
 		resp, err := c.attempt(ctx, method, path, body, headers)
 		status := 0
 		retryAfter := ""
+		if resp != nil {
+			status, retryAfter = resp.status, resp.retryAfter
+		}
 		switch {
 		case err != nil:
 			lastErr = err
@@ -95,15 +98,11 @@ func (c *Client) send(
 			method == http.MethodGet && strings.HasPrefix(path, "/providers/") && strings.HasSuffix(path, "/delete_safe") && resp.status == http.StatusNotAcceptable:
 			return resp, nil
 		default:
-			status, retryAfter = resp.status, resp.retryAfter
 			apiErr := newAPIError(method, path, resp.status, resp.body)
 			if resp.redirect != "" {
 				apiErr.Message = resp.redirect
 			}
 			lastErr = apiErr
-			if scimSyncFailed(method, apiErr) {
-				return nil, apiErr
-			}
 		}
 
 		if attempt >= c.retry.maxAttempts || !c.retryableRequest(method, path, body, status, err) {
@@ -157,18 +156,17 @@ func (c *Client) attempt(
 	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		// A truncated read is a transport failure like any other, and is
-		// reported as one so the retry rules see it that way.
-		return nil, fmt.Errorf("read %s %s response: %w", method, path, err)
-	}
-	return &rawResponse{
+	result := &rawResponse{
 		body:        raw,
 		contentType: resp.Header.Get("Content-Type"),
 		status:      resp.StatusCode,
 		retryAfter:  resp.Header.Get("Retry-After"),
 		redirect:    redirectMessage(resp.StatusCode, req.URL, resp.Header.Get("Location")),
-	}, nil
+	}
+	if err != nil {
+		return result, fmt.Errorf("read %s %s response: %w", method, path, err)
+	}
+	return result, nil
 }
 
 // retryable decides whether the failure just seen may be tried again. status is
@@ -189,8 +187,11 @@ func (c *Client) attempt(
 //
 // GET, PUT and DELETE are idempotent across this API — Rauthy's PUTs are full
 // replacements (except password changes) and its DELETEs answer the same way for an object that is
-// already gone — so they retry on every failure in the first list, except a
-// PUT whose SCIM sync failed after Rauthy stored it (see scimSyncFailed).
+// already gone — so they retry on every failure in the first list, except
+// PUT on HTTP 500. A Rauthy handler may have stored the update before failing,
+// regardless of the error code. For example, a client update saves its SCIM
+// settings before syncing; recording a failed sync can itself fail with a
+// Connection error. Replaying the PUT can skip the sync and hide the failure.
 //
 // POST is not, in general, and gets two narrow exemptions:
 //
@@ -217,6 +218,9 @@ func (c *Client) retryable(method, path string, status int, err error) bool {
 	case http.MethodGet, http.MethodHead, http.MethodDelete:
 		return true
 	case http.MethodPut:
+		if status == http.StatusInternalServerError {
+			return false
+		}
 		if !strings.HasSuffix(path, secretRotationSuffix) {
 			return true
 		}
@@ -244,16 +248,6 @@ func (c *Client) retryableRequest(method, path string, body []byte, status int, 
 		}
 	}
 	return c.retryable(method, path, status, err)
-}
-
-// scimSyncFailed reports a PUT that Rauthy stored before its SCIM sync failed.
-// A client update saves the SCIM settings, then syncs; a failed sync answers
-// 500 with error "Scim". A replay finds the settings already stored, skips the
-// sync, answers 200 and hides the failure, so it is not replayed. Other 500s,
-// such as a lost database leader, come before anything is stored and are
-// retried.
-func scimSyncFailed(method string, apiErr *APIError) bool {
-	return method == http.MethodPut && apiErr.ErrorCode == "Scim"
 }
 
 // secretRotationSuffix ends the path of every PUT that rotates a secret. An

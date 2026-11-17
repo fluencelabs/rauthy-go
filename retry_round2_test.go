@@ -184,23 +184,25 @@ func TestPasswordUpdateRetryMatrix(t *testing.T) {
 	}
 }
 
-// A PUT Rauthy stored before its SCIM sync failed answers 500 with error
-// "Scim"; a replay would answer 200 and hide the failure, so it is returned as
-// is. Any other 5xx on a PUT, a 500 from a lost database leader included, is
-// retried.
+// A PUT can be stored before a 500, regardless of its error code. Replaying
+// it could hide that failure. Proxy failures and rate limits remain retryable.
 func TestPutRetryOnServerErrors(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		status int
 		body   string
+		code   string
 		want   int32
 	}{
-		{"scim", http.StatusInternalServerError, `{"error":"Scim","message":"sync failed"}`, 1},
-		{"connection", http.StatusInternalServerError, `{"error":"Connection","message":"leader changed"}`, 2},
-		{"bad gateway", http.StatusBadGateway, `{"message":"proxy"}`, 2},
-		{"unavailable", http.StatusServiceUnavailable, `{"message":"proxy"}`, 2},
-		{"too many", http.StatusTooManyRequests, `{"message":"slow down"}`, 2},
+		{"scim", http.StatusInternalServerError, `{"error":"Scim","message":"sync failed"}`, "Scim", 1},
+		{"connection", http.StatusInternalServerError, `{"error":"Connection","message":"leader changed"}`, "Connection", 1},
+		{"unknown", http.StatusInternalServerError, `{"error":"Unknown","message":"failure"}`, "Unknown", 1},
+		{"empty", http.StatusInternalServerError, ``, "", 1},
+		{"bad gateway", http.StatusBadGateway, `{"message":"proxy"}`, "", 2},
+		{"unavailable", http.StatusServiceUnavailable, `{"message":"proxy"}`, "", 2},
+		{"timeout", http.StatusGatewayTimeout, `{"message":"proxy"}`, "", 2},
+		{"too many", http.StatusTooManyRequests, `{"message":"slow down"}`, "", 2},
 	} {
 		for _, call := range []string{"client", "group"} {
 			t.Run(tc.name+"/"+call, func(t *testing.T) {
@@ -211,8 +213,9 @@ func TestPutRetryOnServerErrors(t *testing.T) {
 				}
 				var apiErr *rauthy.APIError
 				switch {
-				case tc.want == 1 && (!errors.As(err, &apiErr) || apiErr.ErrorCode != "Scim"):
-					t.Errorf("err = %v, want the Scim 500", err)
+				case tc.want == 1 && (!errors.As(err, &apiErr) || apiErr.ErrorCode != tc.code ||
+					apiErr.StatusCode != http.StatusInternalServerError):
+					t.Errorf("err = %v, want the original %s 500", err, tc.code)
 				case tc.want > 1 && err != nil:
 					t.Errorf("err = %v, want success after the retry", err)
 				}
@@ -244,10 +247,97 @@ func putAfterFailure(t *testing.T, call string, status int, body string) (int32,
 	if err != nil {
 		t.Fatal(err)
 	}
-	if call == "client" {
-		_, err = c.UpdateClient(t.Context(), "x", rauthy.UpdateClientRequest{ID: "x"})
-	} else {
-		_, err = c.UpdateGroup(t.Context(), "x", rauthy.GroupRequest{Group: "x"})
+	update := func() error {
+		if call == "client" {
+			_, updateErr := c.UpdateClient(t.Context(), "x", rauthy.UpdateClientRequest{ID: "x"})
+			return updateErr
+		}
+		_, updateErr := c.UpdateGroup(t.Context(), "x", rauthy.GroupRequest{Group: "x"})
+		return updateErr
 	}
-	return calls.Load(), err
+	err = update()
+	firstCalls := calls.Load()
+	if nextErr := update(); nextErr != nil {
+		t.Errorf("next update on the same Client: %v", nextErr)
+	}
+	if got := calls.Load() - firstCalls; got != 1 {
+		t.Errorf("next update requests=%d, want 1", got)
+	}
+	return firstCalls, err
+}
+
+func TestGetDeleteRetryOnInternalServerError(t *testing.T) {
+	t.Parallel()
+	for _, method := range []string{http.MethodGet, http.MethodDelete} {
+		t.Run(method, func(t *testing.T) {
+			t.Parallel()
+			var seen atomic.Int32
+			c, calls := newRetryClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != method {
+					t.Errorf("method=%s, want %s", r.Method, method)
+				}
+				if seen.Add(1) == 1 {
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = io.WriteString(w, `{"error":"Connection","message":"leader changed"}`)
+					return
+				}
+				_, _ = io.WriteString(w, `{"id":"x","name":"x"}`)
+			})
+			var err error
+			if method == http.MethodGet {
+				_, err = c.GetUser(t.Context(), "x")
+			} else {
+				err = c.DeleteGroup(t.Context(), "x")
+			}
+			if err != nil {
+				t.Errorf("%s after 500: %v", method, err)
+			}
+			if got := calls.Load(); got != 2 {
+				t.Errorf("requests=%d, want 2", got)
+			}
+		})
+	}
+}
+
+func TestRetryTruncatedServerError(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		method  string
+		status  int
+		want    int32
+		wantErr error
+	}{
+		{http.MethodPut, http.StatusInternalServerError, 1, io.ErrUnexpectedEOF},
+		{http.MethodGet, http.StatusInternalServerError, 2, nil},
+		{http.MethodPut, http.StatusGatewayTimeout, 2, nil},
+	} {
+		t.Run(tc.method+"/"+strconv.Itoa(tc.status), func(t *testing.T) {
+			t.Parallel()
+			var seen atomic.Int32
+			c, calls := newRetryClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != tc.method {
+					t.Errorf("method=%s, want %s", r.Method, tc.method)
+				}
+				if seen.Add(1) == 1 {
+					w.Header().Set("Content-Length", "100")
+					w.WriteHeader(tc.status)
+					_, _ = io.WriteString(w, `{"error":`)
+					return
+				}
+				_, _ = io.WriteString(w, `{"id":"x"}`)
+			})
+			var err error
+			if tc.method == http.MethodPut {
+				_, err = c.UpdateClient(t.Context(), "x", rauthy.UpdateClientRequest{ID: "x"})
+			} else {
+				_, err = c.GetClient(t.Context(), "x")
+			}
+			if !errors.Is(err, tc.wantErr) {
+				t.Errorf("err=%v, want %v", err, tc.wantErr)
+			}
+			if got := calls.Load(); got != tc.want {
+				t.Errorf("requests=%d, want %d", got, tc.want)
+			}
+		})
+	}
 }
