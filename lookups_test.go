@@ -134,3 +134,37 @@ func TestListLookupsReturnTheFoundRecord(t *testing.T) {
 		})
 	}
 }
+
+func TestGetGroupByNamePositionsAndAbsence(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		list  string
+		found bool
+	}{
+		"first":                    {`[{"id":"wanted","name":"developers"},{"id":"other","name":"admins"}]`, true},
+		"last":                     {`[{"id":"other","name":"admins"},{"id":"wanted","name":"developers"}]`, true},
+		"missing in nonempty list": {`[{"id":"other","name":"admins"}]`, false},
+		"empty list":               {`[]`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(tc.list))
+			})
+			got, err := c.GetGroupByName(t.Context(), "developers")
+			if !tc.found {
+				if got != nil || !rauthy.IsNotFound(err) {
+					t.Fatalf("lookup = %+v, %v, want nil and IsNotFound", got, err)
+				}
+				return
+			}
+			if err != nil || got == nil {
+				t.Fatalf("lookup = %+v, %v", got, err)
+			}
+			if got.ID != "wanted" || got.Name != "developers" {
+				t.Errorf("lookup = %+v, want the matching group", got)
+			}
+		})
+	}
+}

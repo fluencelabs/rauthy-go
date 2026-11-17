@@ -210,3 +210,38 @@ func TestAuthProvider_ForbiddenNamesTheAccessGroup(t *testing.T) {
 		t.Errorf("err = %v, want it to name the missing right", err)
 	}
 }
+
+func TestAuthProviderLookupsPreserveOptionalFields(t *testing.T) {
+	t.Parallel()
+	rich := strings.NewReplacer(
+		`"jwks_endpoint":null`, `"jwks_endpoint":"https://idp.example.com/jwks"`,
+		`"admin_claim_path":null`, `"admin_claim_path":"roles.admin"`,
+		`"admin_claim_value":null`, `"admin_claim_value":"administrator"`,
+		`"mfa_claim_path":null`, `"mfa_claim_path":"amr"`,
+		`"mfa_claim_value":null`, `"mfa_claim_value":"mfa"`,
+		`"client_secret_post":false`, `"client_secret_post":true`,
+		`"auto_onboarding":false`, `"auto_onboarding":true`,
+		`"auto_link":false`, `"auto_link":true`,
+	).Replace(oneProviderJSON)
+	for fixture, list := range map[string]string{"null and false": oneProviderJSON, "populated and true": rich} {
+		for method, get := range map[string]func(context.Context, *rauthy.Client) (*rauthy.AuthProviderResponse, error){
+			"by id": func(ctx context.Context, c *rauthy.Client) (*rauthy.AuthProviderResponse, error) {
+				return c.GetAuthProvider(ctx, "provider-1")
+			},
+			"by name": func(ctx context.Context, c *rauthy.Client) (*rauthy.AuthProviderResponse, error) {
+				return c.GetAuthProviderByName(ctx, "Example IdP")
+			},
+		} {
+			t.Run(fixture+"/"+method, func(t *testing.T) {
+				t.Parallel()
+				other := `{"id":"other","name":"Other IdP"}`
+				wanted := strings.TrimSuffix(strings.TrimPrefix(list, "["), "]")
+				c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte("[" + other + "," + wanted + "," + other + "]"))
+				})
+				lookup(get)(t, c, wanted)
+			})
+		}
+	}
+}
