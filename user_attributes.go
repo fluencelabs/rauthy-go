@@ -93,8 +93,10 @@ const userAttrPathBase = "/users/attr"
 // under the lock, so the retry can overlap its own first attempt if that one
 // reached the server. A POST is not retried once it may have been sent.
 //
-// Reads of the attributes are left unserialised: in the Rauthy versions this
-// client supports they do not store the attribute list back. A write also
+// Reads are serialised too: a read that finds the cache empty stores the list
+// it selected, and Rauthy 0.37.2 empties the cache on every create, so a read
+// started before a create could store a list without the new attribute. A
+// write also
 // takes Client.scopeMu, after userAttrMu: Rauthy edits the scopes' attribute
 // mappings and empties the scope cache on it, which a concurrent scope call
 // would otherwise overwrite with a stale list (see the note above scopePath).
@@ -126,6 +128,11 @@ func (c *Client) CreateUserAttr(ctx context.Context, req UserAttrRequest) (*User
 
 // ListUserAttrs issues GET /users/attr. Requires UserAttributes:Read.
 func (c *Client) ListUserAttrs(ctx context.Context) ([]UserAttrResponse, error) {
+	if err := c.userAttrMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.userAttrMu.unlock()
+
 	var out userAttrListResponse
 	if err := c.do(ctx, http.MethodGet, userAttrPathBase, nil, &out); err != nil {
 		return nil, err

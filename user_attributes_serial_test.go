@@ -60,34 +60,45 @@ func TestUserAttrWritesAreSerialised(t *testing.T) {
 	}
 }
 
-// Reads are deliberately not serialised: they do not mutate the list, and
-// holding the lock over them would make a parallel refresh needlessly slow.
-func TestUserAttrReadsAreNotSerialised(t *testing.T) {
+// Reads are serialised with the writes: a read that refills Rauthy's empty
+// cache stores the whole list back, and could store one without an attribute
+// created meanwhile.
+func TestUserAttrReadsAreSerialised(t *testing.T) {
 	t.Parallel()
 
 	var inFlight, overlaps atomic.Int32
 
-	c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if inFlight.Add(1) > 1 {
 			overlaps.Add(1)
 		}
 		time.Sleep(5 * time.Millisecond)
 		inFlight.Add(-1)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"values":[]}`))
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"values":[]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"name":"department","user_editable":false}`))
 	})
 
 	var wg sync.WaitGroup
-	for range 8 {
+	for i := range 8 {
 		wg.Go(func() {
-			if _, err := c.ListUserAttrs(context.Background()); err != nil {
-				t.Errorf("list: %v", err)
+			var err error
+			if i%2 == 0 {
+				_, err = c.ListUserAttrs(context.Background())
+			} else {
+				_, err = c.CreateUserAttr(context.Background(), rauthy.UserAttrRequest{Name: "department"})
+			}
+			if err != nil {
+				t.Errorf("call: %v", err)
 			}
 		})
 	}
 	wg.Wait()
 
-	if overlaps.Load() == 0 {
-		t.Error("no reads overlapped; the read path may have been put behind the write lock")
+	if got := overlaps.Load(); got != 0 {
+		t.Errorf("%d user attribute calls overlapped; they must be serialised", got)
 	}
 }
