@@ -3,12 +3,14 @@ package rauthy
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -56,6 +58,16 @@ type rawResponse struct {
 // on a second attempt, so it must not be mistaken for a transport failure.
 type buildError struct{ err error }
 
+// withoutBaseURL replaces the absolute URL a *url.Error repeats with the
+// request path. The base URL is a Secret: a mistaken one can carry a
+// credential in its path, and errors end up in logs.
+func withoutBaseURL(err error, path string) error {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
+		urlErr.URL = path
+	}
+	return err
+}
+
 func (e *buildError) Error() string { return e.err.Error() }
 
 func (e *buildError) Unwrap() error { return e.err }
@@ -79,7 +91,8 @@ func (c *Client) send(
 		switch {
 		case err != nil:
 			lastErr = err
-		case resp.status >= 200 && resp.status < 300:
+		case resp.status >= 200 && resp.status < 300,
+			method == http.MethodGet && strings.HasPrefix(path, "/providers/") && strings.HasSuffix(path, "/delete_safe") && resp.status == http.StatusNotAcceptable:
 			return resp, nil
 		default:
 			status, retryAfter = resp.status, resp.retryAfter
@@ -90,7 +103,7 @@ func (c *Client) send(
 			lastErr = apiErr
 		}
 
-		if attempt >= c.retry.maxAttempts || !c.retryable(method, path, status, err) {
+		if attempt >= c.retry.maxAttempts || !c.retryableRequest(method, path, body, status, err) {
 			return nil, lastErr
 		}
 		delay, ok := c.delayFor(attempt, retryAfter)
@@ -136,7 +149,7 @@ func (c *Client) attempt(
 		if isUnparseableLocation(err) {
 			return nil, &redirectError{method: method, path: path}
 		}
-		return nil, fmt.Errorf("%s %s: %w", method, path, err)
+		return nil, fmt.Errorf("%s %s: %w", method, path, withoutBaseURL(err, path))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -172,7 +185,7 @@ func (c *Client) attempt(
 // waiting.
 //
 // GET, PUT and DELETE are idempotent across this API — Rauthy's PUTs are full
-// replacements and its DELETEs answer the same way for an object that is
+// replacements (except password changes) and its DELETEs answer the same way for an object that is
 // already gone — so they retry on every failure in the first list.
 //
 // POST is not, in general, and gets two narrow exemptions:
@@ -212,6 +225,21 @@ func (c *Client) retryable(method, path string, status int, err error) bool {
 	default:
 		return false
 	}
+}
+
+// A user password update checks password history, so replaying a committed
+// update can reject the password that the first attempt just installed.
+func (c *Client) retryableRequest(method, path string, body []byte, status int, err error) bool {
+	if method == http.MethodPut && strings.HasPrefix(path, "/users/") {
+		var request struct {
+			Password *string `json:"password"`
+		}
+		if json.Unmarshal(body, &request) == nil && request.Password != nil {
+			return retryableFailure(status, err) &&
+				(status == http.StatusTooManyRequests || (err != nil && sentNothing(err)))
+		}
+	}
+	return c.retryable(method, path, status, err)
 }
 
 // secretRotationSuffix ends the path of every PUT that rotates a secret. An

@@ -54,7 +54,7 @@ func TestCreateAPIKey_ReadsAPlainTextSecret(t *testing.T) {
 	if gotAccept != "text/plain" {
 		t.Errorf("Accept = %q, want text/plain", gotAccept)
 	}
-	if got != "deploy$s3cr3t" {
+	if got.Reveal() != "deploy$s3cr3t" {
 		t.Errorf("secret = %q, want the trimmed <name>$<secret> form", got)
 	}
 	if gotBody["name"] != "deploy" || gotBody["exp"] != float64(exp) {
@@ -80,7 +80,7 @@ func TestRotateAPIKeySecret_ReadsAPlainTextSecret(t *testing.T) {
 	if gotMethod != http.MethodPut || gotPath != "/auth/v1/api_keys/deploy/secret" {
 		t.Errorf("got %s %s, want PUT /auth/v1/api_keys/deploy/secret", gotMethod, gotPath)
 	}
-	if got != "deploy$rotated" {
+	if got.Reveal() != "deploy$rotated" {
 		t.Errorf("secret = %q", got)
 	}
 }
@@ -175,6 +175,9 @@ func TestUpdateAPIKey_SendsTheNameInTheBody(t *testing.T) {
 
 	var gotBody map[string]any
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/auth/v1/api_keys/deploy" {
+			t.Errorf("request = %s %s", r.Method, r.URL.Path)
+		}
 		raw, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(raw, &gotBody)
 		w.WriteHeader(http.StatusOK)

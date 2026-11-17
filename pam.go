@@ -155,7 +155,7 @@ type PamHostUpdateRequest struct {
 // PamHostSecretResponse is the shared secret a host authenticates with.
 type PamHostSecretResponse struct {
 	ID     string `json:"id"`
-	Secret string `json:"secret"`
+	Secret Secret `json:"secret"`
 }
 
 const (

@@ -13,7 +13,6 @@ import (
 	"net/textproto"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -26,14 +25,14 @@ const defaultTimeout = 30 * time.Second
 
 // Client talks to the Rauthy admin API using an API key.
 type Client struct {
-	baseURL    string
-	apiKey     string
+	baseURL    Secret
+	apiKey     Secret
 	httpClient *http.Client
-	// userAttrMu serialises writes to the user attribute definitions, which
+	// userAttrMu is a context-aware semaphore that serialises writes to the user attribute definitions, which
 	// Rauthy stores as one cached list and rewrites without locking. See the
 	// note above userAttrPathBase in user_attributes.go for what happens
 	// without it.
-	userAttrMu sync.Mutex
+	userAttrMu chan struct{}
 	// retry bounds how hard every request tries before giving up. See retry.go.
 	retry retryPolicy
 }
@@ -56,7 +55,7 @@ func WithHTTPClient(hc *http.Client) Option {
 // maxDelay. Only failures that are safe to repeat are retried (see retry.go).
 //
 // Retried are a 429, a 5xx and a transport failure such as a reset, for GET,
-// PUT and DELETE; a creating POST and a secret rotation only on a 429 or when nothing
+// PUT and DELETE; a creating POST, password update and secret rotation only on a 429 or when nothing
 // was sent. A request that timed out, on the http.Client timeout or the
 // caller's context, is never retried: it may still be running on the server.
 //
@@ -89,20 +88,15 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		// url.Error repeats the raw URL, password included, so only its cause
-		// is kept.
-		if urlErr, ok := errors.AsType[*url.Error](err); ok {
-			err = urlErr.Err
-		}
-		return nil, fmt.Errorf("parse rauthy url: %w", err)
+		return nil, errors.New("parse rauthy url: invalid URL")
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("rauthy url %q must use http or https", u.Redacted())
+		return nil, errors.New("rauthy url must use http or https")
 	}
 	// Request paths are appended to the URL as a string, so a query or
 	// fragment would end up in front of every one of them.
 	if u.RawQuery != "" || u.ForceQuery || strings.Contains(rawURL, "#") {
-		return nil, fmt.Errorf("rauthy url %q must not carry a query or fragment", u.Redacted())
+		return nil, errors.New("rauthy url must not carry a query or fragment")
 	}
 
 	base := strings.TrimRight(u.String(), "/")
@@ -111,8 +105,9 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 	}
 
 	c := &Client{
-		baseURL:    base,
-		apiKey:     apiKey,
+		baseURL:    NewSecret(base),
+		userAttrMu: make(chan struct{}, 1),
+		apiKey:     NewSecret(apiKey),
 		httpClient: &http.Client{Timeout: defaultTimeout, CheckRedirect: noRedirects},
 		retry: retryPolicy{
 			maxAttempts: defaultMaxAttempts,
@@ -137,8 +132,9 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 // wherever it points; the 3xx is reported as an API error instead.
 func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-// BaseURL returns the API root, including the /auth/v1 base path.
-func (c *Client) BaseURL() string { return c.baseURL }
+// BaseURL returns the API root, including the /auth/v1 base path. It is a
+// Secret: a URL can carry a credential, so the caller reveals it on purpose.
+func (c *Client) BaseURL() Secret { return c.baseURL }
 
 // do executes a request against path (relative to the API root), sending body
 // as JSON when non-nil and decoding the response into out when non-nil.
@@ -164,12 +160,12 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 // `<name>$<secret>` line with no envelope around it. Feeding that to do() would
 // fail in json.Unmarshal, so it gets its own path rather than a special case
 // inside the JSON one.
-func (c *Client) doText(ctx context.Context, method, path string, body any) (string, error) {
+func (c *Client) doText(ctx context.Context, method, path string, body any) (Secret, error) {
 	raw, err := c.doRaw(ctx, method, path, body, "text/plain")
 	if err != nil {
-		return "", err
+		return Secret{}, err
 	}
-	return string(bytes.TrimSpace(raw)), nil
+	return NewSecret(string(bytes.TrimSpace(raw))), nil
 }
 
 // doRaw sends body as JSON and returns the response body untouched. accept is
@@ -202,12 +198,12 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 	if err := checkPath(path); err != nil {
 		return nil, fmt.Errorf("build %s %s: %w", method, path, err)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL.Reveal()+path, body)
 	if err != nil {
-		return nil, fmt.Errorf("build %s %s: %w", method, path, err)
+		return nil, fmt.Errorf("build %s %s: %w", method, path, withoutBaseURL(err, path))
 	}
 	// Rauthy expects the key as `API-Key <name>$<secret>`.
-	req.Header.Set("Authorization", "API-Key "+c.apiKey)
+	req.Header.Set("Authorization", "API-Key "+c.apiKey.Reveal())
 	return req, nil
 }
 

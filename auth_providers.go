@@ -28,7 +28,7 @@ type AuthProviderRequest struct {
 	UserinfoEndpoint      string  `json:"userinfo_endpoint"`
 	JwksEndpoint          *string `json:"jwks_endpoint,omitempty"`
 	ClientID              string  `json:"client_id"`
-	ClientSecret          *string `json:"client_secret,omitempty"`
+	ClientSecret          *Secret `json:"client_secret,omitempty"`
 	Scope                 string  `json:"scope"`
 	AdminClaimPath        *string `json:"admin_claim_path,omitempty"`
 	AdminClaimValue       *string `json:"admin_claim_value,omitempty"`
@@ -61,7 +61,7 @@ type AuthProviderResponse struct {
 	UserinfoEndpoint      string  `json:"userinfo_endpoint"`
 	JwksEndpoint          *string `json:"jwks_endpoint,omitempty"`
 	ClientID              string  `json:"client_id"`
-	ClientSecret          *string `json:"client_secret,omitempty"`
+	ClientSecret          *Secret `json:"client_secret,omitempty"`
 	Scope                 string  `json:"scope"`
 	AdminClaimPath        *string `json:"admin_claim_path,omitempty"`
 	AdminClaimValue       *string `json:"admin_claim_value,omitempty"`
