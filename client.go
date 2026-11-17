@@ -24,7 +24,7 @@ const APIBasePath = "/auth/v1"
 const defaultTimeout = 30 * time.Second
 
 // Client talks to the Rauthy admin API using an API key.
-type Client struct {
+type Client struct { //nolint:recvcheck // Format must also redact non-pointer values.
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
@@ -88,20 +88,15 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		// url.Error repeats the raw URL, password included, so only its cause
-		// is kept.
-		if urlErr, ok := errors.AsType[*url.Error](err); ok {
-			err = urlErr.Err
-		}
-		return nil, fmt.Errorf("parse rauthy url: %w", err)
+		return nil, errors.New("parse rauthy url: invalid URL")
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("rauthy url %q must use http or https", u.Redacted())
+		return nil, errors.New("rauthy url must use http or https")
 	}
 	// Request paths are appended to the URL as a string, so a query or
 	// fragment would end up in front of every one of them.
 	if u.RawQuery != "" || u.ForceQuery || strings.Contains(rawURL, "#") {
-		return nil, fmt.Errorf("rauthy url %q must not carry a query or fragment", u.Redacted())
+		return nil, errors.New("rauthy url must not carry a query or fragment")
 	}
 
 	base := strings.TrimRight(u.String(), "/")
