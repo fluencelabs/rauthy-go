@@ -80,6 +80,19 @@ incompatibility for some callers: the four structs are no longer comparable
 with `==` and cannot be map keys, and a positional (unkeyed) literal of them
 no longer compiles. Keyed literals are unaffected.
 
+### Known limits
+
+- If a response body is truncated, the SDK returns a read error instead of an
+  `APIError`. Status helpers such as `IsNotFound` cannot classify that error.
+- Cancellation or timeout releases the SDK's scope and user-attribute locks
+  while the server may still be processing the request. Locks cover only one
+  `Client`. Rauthy's logins, token requests and SCIM synchronization can refill
+  the scope cache outside those locks, so they cannot prevent every cache race.
+- Retrying a PUT after losing its response can hide a SCIM synchronization
+  failure: Rauthy saves the client before syncing, and an identical PUT may
+  succeed without repeating that sync. Rauthy retries recorded failed SCIM
+  tasks in the background, subject to its configured retry limit.
+
 ### Validation
 
 `validation.go` carries the patterns, bounds and enums Rauthy checks on OIDC
