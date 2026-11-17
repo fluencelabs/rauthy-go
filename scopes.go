@@ -93,11 +93,16 @@ type ScopeRequest struct {
 	ClaimsAtRoot      bool     `json:"claims_at_root"`
 }
 
-// Rauthy keeps the scopes as one cached list and rewrites it on every create,
-// update and delete without locking: concurrent writes lose one of them from
-// the cache, and the lost scope reads as missing until the cache expires,
-// although it exists. Writes are therefore serialised through Client.scopeMu.
-// Like the user attributes, this covers one Client only.
+// Rauthy keeps the scopes as one cached list and stores it back whole without
+// locking: a create, update or delete stores the list it changed, and a read
+// that finds the cache empty stores the list it just selected. Two of these at
+// once can store a list that misses a scope; that scope then reads as missing
+// until the cache expires (up to 12 hours), although it exists. Every scope
+// call, reads included, is therefore serialised through Client.scopeMu, and
+// user attribute writes, which edit scope mappings and empty that cache, take
+// it as well. The lock covers one Client only, and a call abandoned on a
+// timeout or cancellation releases it while the server may still run it, as
+// for the user attributes.
 func scopePath(id string) string {
 	return "/scopes/" + url.PathEscape(id)
 }
@@ -118,6 +123,11 @@ func (c *Client) CreateScope(ctx context.Context, req ScopeRequest) (*ScopeRespo
 
 // ListScopes issues GET /scopes. Requires Scopes:Read.
 func (c *Client) ListScopes(ctx context.Context) ([]ScopeResponse, error) {
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
+
 	var out []ScopeResponse
 	if err := c.do(ctx, http.MethodGet, "/scopes", nil, &out); err != nil {
 		return nil, err

@@ -11,35 +11,45 @@ import (
 	"github.com/fluencelabs/rauthy-go"
 )
 
-// Rauthy rewrites its cached scope list on every write without locking, so two
-// overlapping writes lose one scope from the cache: it then reads as missing
-// although it exists. The client serialises scope writes, as Terraform creates
-// independent scopes ten at a time.
-func TestScopeWritesAreSerialised(t *testing.T) {
+// Rauthy stores its cached scope list back whole on every write and on a read
+// that refills the cache, without locking, so two overlapping calls can lose a
+// scope from the cache: it then reads as missing although it exists. The
+// client serialises every scope call, and user attribute writes, which edit
+// scope mappings, with them. Terraform creates independent objects ten at a
+// time.
+func TestScopeCallsAreSerialised(t *testing.T) {
 	t.Parallel()
 
 	var inFlight, overlaps atomic.Int32
-	c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if inFlight.Add(1) > 1 {
 			overlaps.Add(1)
 		}
 		time.Sleep(5 * time.Millisecond)
 		inFlight.Add(-1)
 		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`[{"id":"s1","name":"read"}]`))
+			return
+		}
 		_, _ = w.Write([]byte(`{"id":"s1","name":"read"}`))
 	})
 
 	var wg sync.WaitGroup
-	for i := range 8 {
+	for i := range 10 {
 		wg.Go(func() {
 			var err error
-			switch i % 3 {
+			switch i % 5 {
 			case 0:
 				_, err = c.CreateScope(context.Background(), rauthy.ScopeRequest{Scope: "read"})
 			case 1:
 				_, err = c.UpdateScope(context.Background(), "s1", rauthy.ScopeRequest{Scope: "read"})
-			default:
+			case 2:
 				err = c.DeleteScope(context.Background(), "s1")
+			case 3:
+				_, err = c.ListScopes(context.Background())
+			default:
+				err = c.DeleteUserAttr(context.Background(), "department")
 			}
 			if err != nil {
 				t.Errorf("write: %v", err)
@@ -49,7 +59,7 @@ func TestScopeWritesAreSerialised(t *testing.T) {
 	wg.Wait()
 
 	if got := overlaps.Load(); got != 0 {
-		t.Errorf("%d scope writes overlapped; they must be serialised", got)
+		t.Errorf("%d scope calls overlapped; they must be serialised", got)
 	}
 }
 

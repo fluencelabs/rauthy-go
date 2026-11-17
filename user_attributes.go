@@ -93,9 +93,11 @@ const userAttrPathBase = "/users/attr"
 // under the lock, so the retry can overlap its own first attempt if that one
 // reached the server. A POST is not retried once it may have been sent.
 //
-// Reads are deliberately left unserialised — they do not mutate the list, and
-// blocking them would not make a concurrently corrupted list any more
-// accurate.
+// Reads of the attributes are left unserialised: in the Rauthy versions this
+// client supports they do not store the attribute list back. A write also
+// takes Client.scopeMu, after userAttrMu: Rauthy edits the scopes' attribute
+// mappings and empties the scope cache on it, which a concurrent scope call
+// would otherwise overwrite with a stale list (see the note above scopePath).
 //
 // If a Rauthy release makes these writes atomic, the semaphore can go.
 
@@ -110,6 +112,10 @@ func (c *Client) CreateUserAttr(ctx context.Context, req UserAttrRequest) (*User
 		return nil, err
 	}
 	defer c.userAttrMu.unlock()
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
 
 	var out UserAttrResponse
 	if err := c.do(ctx, http.MethodPost, userAttrPathBase, req, &out); err != nil {
@@ -163,6 +169,10 @@ func (c *Client) UpdateUserAttr(ctx context.Context, name string, req UserAttrRe
 		return err
 	}
 	defer c.userAttrMu.unlock()
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return err
+	}
+	defer c.scopeMu.unlock()
 
 	return c.do(ctx, http.MethodPut, userAttrPath(name), req, nil)
 }
@@ -174,6 +184,10 @@ func (c *Client) DeleteUserAttr(ctx context.Context, name string) error {
 		return err
 	}
 	defer c.userAttrMu.unlock()
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return err
+	}
+	defer c.scopeMu.unlock()
 
 	return c.do(ctx, http.MethodDelete, userAttrPath(name), nil, nil)
 }
