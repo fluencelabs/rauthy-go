@@ -99,6 +99,7 @@ func (c *Client) send(
 			return resp, nil
 		default:
 			apiErr := newAPIError(method, path, resp.status, resp.body)
+			apiErr.bareNotFound = resp.status == http.StatusNotFound && len(resp.body) == 0 && resp.contentType == ""
 			if resp.redirect != "" {
 				apiErr.Message = resp.redirect
 			}

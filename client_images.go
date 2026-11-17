@@ -3,6 +3,7 @@ package rauthy
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -51,10 +52,9 @@ func clientImagePath(id string, kind ImageKind) (string, error) {
 
 // GetClientImage issues GET /clients/{id}/{logo,favicon}.
 //
-// Rauthy returns a bare 404 for both a missing image and a missing client.
-// IsNotFound is false for that response because a missing route can return the
-// same status and body. The images are served to the login page and require no
-// special right beyond a valid key.
+// An HTTP 404 with no body or Content-Type matches ErrImageNotFound and
+// IsNotFound. A missing proxy route can produce the same response. The images
+// are served to the login page and require no special right beyond a valid key.
 func (c *Client) GetClientImage(ctx context.Context, id string, kind ImageKind) (*Image, error) {
 	path, err := clientImagePath(id, kind)
 	if err != nil {
@@ -62,6 +62,9 @@ func (c *Client) GetClientImage(ctx context.Context, id string, kind ImageKind) 
 	}
 	data, contentType, err := c.download(ctx, path)
 	if err != nil {
+		if apiErr, ok := errors.AsType[*APIError](err); ok && apiErr.bareNotFound {
+			return nil, fmt.Errorf("%w: %w", err, ErrImageNotFound)
+		}
 		return nil, err
 	}
 	return &Image{Data: data, ContentType: contentType}, nil

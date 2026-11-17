@@ -2,12 +2,14 @@ package rauthy_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -173,8 +175,111 @@ func TestGetClientImageReturnsRawBytes(t *testing.T) {
 	// Rauthy returns the same bare 404 for a missing image or client.
 	_, missingErr := c.GetClientImage(context.Background(), "app", rauthy.ImageLogo)
 	apiErr, ok := errors.AsType[*rauthy.APIError](missingErr)
-	if !ok || apiErr.StatusCode != http.StatusNotFound || rauthy.IsNotFound(missingErr) {
-		t.Fatalf("missing logo: got %v, want an unclassified HTTP 404 APIError", missingErr)
+	if !ok || apiErr.StatusCode != http.StatusNotFound || !rauthy.IsNotFound(missingErr) {
+		t.Fatalf("missing logo: got %v, want a classified HTTP 404 APIError", missingErr)
+	}
+}
+
+func TestGetClientImageLiveNotFound(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		version string
+		kind    rauthy.ImageKind
+	}{
+		{"0.36.2", rauthy.ImageLogo},
+		{"0.36.2", rauthy.ImageFavicon},
+		{"0.37.2", rauthy.ImageLogo},
+		{"0.37.2", rauthy.ImageFavicon},
+	} {
+		t.Run(tc.version+"/"+string(tc.kind), func(t *testing.T) {
+			t.Parallel()
+
+			path := "/clients/rr2missing/" + string(tc.kind)
+			c := replayClientImage404(t, tc.version, path)
+			image, err := c.GetClientImage(t.Context(), "rr2missing", tc.kind)
+			if image != nil || !errors.Is(err, rauthy.ErrImageNotFound) || !rauthy.IsNotFound(err) {
+				t.Errorf("image = %v, err = %v, want ErrImageNotFound and IsNotFound", image, err)
+			}
+		})
+	}
+}
+
+func replayClientImage404(t *testing.T, version, path string) *rauthy.Client {
+	t.Helper()
+
+	body, err := os.ReadFile("testdata/live-notfound-" + version + ".json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var responses []struct {
+		Method      string `json:"method"`
+		Path        string `json:"path"`
+		Status      int    `json:"status"`
+		ContentType string `json:"content_type"`
+		Body        string `json:"body"`
+	}
+	if decodeErr := json.Unmarshal(body, &responses); decodeErr != nil {
+		t.Fatal(decodeErr)
+	}
+	for _, response := range responses {
+		if response.Method == http.MethodGet && response.Path == path {
+			return newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != response.Method || r.URL.Path != "/auth/v1"+path {
+					t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+				}
+				if response.ContentType != "" {
+					w.Header().Set("Content-Type", response.ContentType)
+				}
+				w.WriteHeader(response.Status)
+				_, _ = io.WriteString(w, response.Body)
+			})
+		}
+	}
+	t.Fatalf("missing fixture for GET %s", path)
+	return nil
+}
+
+func TestClientImageProxy404RemainsAnAPIError(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name        string
+		method      string
+		contentType string
+		body        string
+	}{
+		{"text route error", http.MethodGet, "text/plain", "404 page not found\n"},
+		{"empty text route error", http.MethodGet, "text/plain", ""},
+		{"JSON route error", http.MethodGet, "", `{"status":404}`},
+		{"bare delete error", http.MethodDelete, "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != tc.method {
+					t.Errorf("method = %s, want %s", r.Method, tc.method)
+				}
+				// Disable type sniffing to exercise nonempty bodies without a Content-Type.
+				w.Header()["Content-Type"] = nil
+				if tc.contentType != "" {
+					w.Header().Set("Content-Type", tc.contentType)
+				}
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = io.WriteString(w, tc.body)
+			})
+			var err error
+			if tc.method == http.MethodDelete {
+				err = c.DeleteClientImage(t.Context(), "app", rauthy.ImageLogo)
+			} else {
+				_, err = c.GetClientImage(t.Context(), "app", rauthy.ImageLogo)
+			}
+			apiErr, ok := errors.AsType[*rauthy.APIError](err)
+			if !ok || apiErr.StatusCode != http.StatusNotFound || rauthy.IsNotFound(err) {
+				t.Errorf("err = %v, want unclassified HTTP 404 APIError", err)
+			}
+		})
 	}
 }
 

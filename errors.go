@@ -23,7 +23,8 @@ type APIError struct {
 	// ErrorCode is Rauthy's `error` field, e.g. "NotFound", when present.
 	ErrorCode string
 
-	notFound bool
+	notFound     bool
+	bareNotFound bool
 }
 
 func (e *APIError) Error() string {
@@ -90,11 +91,14 @@ func newAPIError(method, path string, status int, raw []byte) *APIError {
 // does not mistake a duplicate for an absence.
 var ErrAmbiguousName = errors.New("name is ambiguous")
 
+// ErrImageNotFound marks the bare 404 that GetClientImage treats as a missing image.
+var ErrImageNotFound = errors.New("client image not found")
+
 // IsNotFound reports whether err is an HTTP 404 with a Rauthy NotFound error
-// response or a missing object determined from a successful list.
+// response, a missing object determined from a successful list, or ErrImageNotFound.
 func IsNotFound(err error) bool {
 	apiErr, ok := errors.AsType[*APIError](err)
-	return ok && apiErr != nil && apiErr.notFound
+	return (ok && apiErr != nil && apiErr.notFound) || errors.Is(err, ErrImageNotFound)
 }
 
 // IsForbidden reports whether err is a 403 from the API. For this client a

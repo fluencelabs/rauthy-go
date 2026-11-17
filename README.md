@@ -109,6 +109,11 @@ no longer compiles. Keyed literals are unaffected.
   with ETag / If-Match, so concurrent writers can overwrite each other's
   changes. Assign one writer per resource or coordinate writes across
   controllers and administrators.
+- **S10. Client image reads.** Rauthy uses HTTP 404 with no body or
+  Content-Type when a client logo or favicon is unavailable. A proxy with a
+  missing image route can return the same response. `GetClientImage` reports
+  `ErrImageNotFound` in either case, so a provider can drop image state.
+  Check that the proxy forwards both image routes before recreating an image.
 
 ### Validation
 
