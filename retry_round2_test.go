@@ -183,3 +183,39 @@ func TestPasswordUpdateRetryMatrix(t *testing.T) {
 		})
 	}
 }
+
+// Rauthy answers 500 after it handled a PUT, for example when the SCIM sync
+// that follows a stored client update fails. A replay would find nothing to
+// change, answer 200 and hide the failure, so the 500 is returned as is.
+func TestPutIsNotReplayedAfterInternalServerError(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	transport := retryRoundTripper(func(*http.Request) (*http.Response, error) {
+		if calls.Add(1) == 1 {
+			return &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"error":"Scim","message":"sync failed"}`)),
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"id":"app"}`)),
+		}, nil
+	})
+	c, err := rauthy.New("https://auth.invalid", "key",
+		rauthy.WithHTTPClient(&http.Client{Transport: transport}),
+		rauthy.WithRetryPolicy(3, 0, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.UpdateClient(t.Context(), "app", rauthy.UpdateClientRequest{ID: "app"})
+	var apiErr *rauthy.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusInternalServerError {
+		t.Errorf("UpdateClient = %v, want the original 500", err)
+	}
+	if calls.Load() != 1 {
+		t.Errorf("calls=%d want=1", calls.Load())
+	}
+}

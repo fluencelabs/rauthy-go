@@ -213,6 +213,13 @@ func (c *Client) retryable(method, path string, status int, err error) bool {
 	case http.MethodGet, http.MethodHead, http.MethodDelete:
 		return true
 	case http.MethodPut:
+		// A 500 is Rauthy's own error after it handled the request: it may
+		// have stored the change and then failed a side effect, such as the
+		// SCIM sync after a client update. A replay then finds nothing to
+		// change, answers 200 and hides that failure.
+		if status == http.StatusInternalServerError {
+			return false
+		}
 		if !strings.HasSuffix(path, secretRotationSuffix) {
 			return true
 		}
