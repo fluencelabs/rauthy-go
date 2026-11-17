@@ -23,9 +23,9 @@ func isUnparseableLocation(err error) bool {
 	return strings.Contains(err.Error(), "failed to parse Location header")
 }
 
-// redirectMessage tells the operator where a refused 3xx pointed, as scheme,
-// host and path: userinfo and the query may carry credentials and are left
-// out. The response body is not used, since it usually repeats the full
+// redirectMessage tells the operator where a refused 3xx pointed, as scheme
+// and host only: the base URL is a Secret and a relative Location inherits its
+// path, so no path, userinfo or query of the target is repeated. The response body is not used, since it usually repeats the full
 // Location. It returns "" for a status that is not a redirect.
 func redirectMessage(status int, reqURL *url.URL, location string) string {
 	if status < http.StatusMultipleChoices || status >= http.StatusBadRequest {
@@ -38,6 +38,6 @@ func redirectMessage(status int, reqURL *url.URL, location string) string {
 	if err != nil {
 		return "redirect refused: its Location header does not parse"
 	}
-	target := url.URL{Scheme: u.Scheme, Host: u.Host, Path: u.Path}
+	target := url.URL{Scheme: u.Scheme, Host: u.Host}
 	return "redirect refused: the server pointed to " + target.String()
 }

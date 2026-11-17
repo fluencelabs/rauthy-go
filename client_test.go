@@ -300,8 +300,8 @@ func TestNew_DoesNotFollowRedirects(t *testing.T) {
 	}
 }
 
-// A refused redirect names where the server tried to send the call, as
-// scheme, host and path only: userinfo and the query may carry credentials.
+// A refused redirect names where the server tried to send the call, as scheme
+// and host only: a path, userinfo or query may carry credentials.
 func TestRefusedRedirect_NamesTheLocation(t *testing.T) {
 	t.Parallel()
 
@@ -312,9 +312,9 @@ func TestRefusedRedirect_NamesTheLocation(t *testing.T) {
 	}{
 		"absolute": {
 			location: "https://admin:hunter2@login.example.com/sso/start?token=abc#frag",
-			want:     "https://login.example.com/sso/start",
+			want:     "pointed to https://login.example.com",
 		},
-		"relative":    {location: "/moved/here?token=abc", want: "/moved/here", relative: true},
+		"relative":    {location: "/moved/here?token=abc", want: "", relative: true},
 		"missing":     {location: "", want: "no Location"},
 		"unparseable": {location: "http://[::1", want: "does not parse"},
 	}
@@ -351,7 +351,7 @@ func checkRedirectError(t *testing.T, err error, want string) {
 	if !strings.Contains(err.Error(), want) {
 		t.Errorf("err = %q, want it to contain %q", err, want)
 	}
-	for _, secret := range []string{"hunter2", "token=abc", "frag"} {
+	for _, secret := range []string{"hunter2", "token=abc", "frag", "/sso/start", "/moved/here"} {
 		if strings.Contains(err.Error(), secret) {
 			t.Errorf("err = %q leaks %q", err, secret)
 		}
@@ -413,5 +413,28 @@ func TestNew_ErrorsDoNotEchoTheURLPassword(t *testing.T) {
 		if strings.Contains(err.Error(), "hunter2") {
 			t.Errorf("New(%q) error %q leaks the password", raw, err)
 		}
+	}
+}
+
+// A relative Location inherits the base URL's path. A credential mistakenly
+// left in that path must not reach the redirect error.
+func TestRefusedRedirect_OmitsBaseURLPath(t *testing.T) {
+	t.Parallel()
+	const token = "SYNTHETICRESETTOKENSYNTHETICRESETTOKEN"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "next?retry=1")
+		w.WriteHeader(http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+	c, err := rauthy.New(srv.URL+"/reset/"+token, "key$secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.GetUser(t.Context(), "u1")
+	if err == nil {
+		t.Fatal("a redirect was not refused")
+	}
+	if strings.Contains(err.Error(), token) {
+		t.Fatalf("redirect error repeats the base URL path: %v", err)
 	}
 }
