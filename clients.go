@@ -40,6 +40,13 @@ func (c *Client) GetClient(ctx context.Context, id string) (*ClientResponse, err
 // ClientResponse.UpdateRequest from a GetClient result and change only what the
 // update is about. Requires Clients:Update.
 func (c *Client) UpdateClient(ctx context.Context, id string, req UpdateClientRequest) (*ClientResponse, error) {
+	// Rauthy checks the scopes against its cached scope list, which it
+	// refills and stores whole when empty (see the note above scopePath).
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
+
 	var out ClientResponse
 	if err := c.do(ctx, http.MethodPut, clientPath(id), req, &out); err != nil {
 		return nil, err

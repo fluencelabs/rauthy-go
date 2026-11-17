@@ -93,12 +93,29 @@ type ScopeRequest struct {
 	ClaimsAtRoot      bool     `json:"claims_at_root"`
 }
 
+// Rauthy keeps the scopes as one cached list and stores it back whole without
+// locking: a create, update or delete stores the list it changed, and a read
+// that finds the cache empty stores the list it just selected. Two of these at
+// once can store a list that misses a scope; that scope then reads as missing
+// until the cache expires (up to 12 hours), although it exists. Every scope
+// call, reads included, is therefore serialised through Client.scopeMu, and
+// user attribute writes, which edit scope mappings and empty that cache, take
+// it as well, and so does a client update, which checks its scopes against
+// that list. The lock covers one Client only: other Clients, the Admin UI and
+// Rauthy's own logins, token requests and background SCIM syncs refill the
+// cache too and are not ordered by it. A call abandoned on a timeout or cancellation releases the
+// lock while the server may still run it, as for the user attributes.
 func scopePath(id string) string {
 	return "/scopes/" + url.PathEscape(id)
 }
 
 // CreateScope issues POST /scopes. Requires the Scopes:Create right.
 func (c *Client) CreateScope(ctx context.Context, req ScopeRequest) (*ScopeResponse, error) {
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
+
 	var out ScopeResponse
 	if err := c.do(ctx, http.MethodPost, "/scopes", req, &out); err != nil {
 		return nil, err
@@ -108,6 +125,11 @@ func (c *Client) CreateScope(ctx context.Context, req ScopeRequest) (*ScopeRespo
 
 // ListScopes issues GET /scopes. Requires Scopes:Read.
 func (c *Client) ListScopes(ctx context.Context) ([]ScopeResponse, error) {
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
+
 	var out []ScopeResponse
 	if err := c.do(ctx, http.MethodGet, "/scopes", nil, &out); err != nil {
 		return nil, err
@@ -149,6 +171,11 @@ func (c *Client) GetScopeByName(ctx context.Context, name string) (*ScopeRespons
 // with ScopeResponse.UpdateRequest from a GetScope result and change only what
 // the update is about. Requires Scopes:Update.
 func (c *Client) UpdateScope(ctx context.Context, id string, req ScopeRequest) (*ScopeResponse, error) {
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
+
 	var out ScopeResponse
 	if err := c.do(ctx, http.MethodPut, scopePath(id), req, &out); err != nil {
 		return nil, err
@@ -158,5 +185,10 @@ func (c *Client) UpdateScope(ctx context.Context, id string, req ScopeRequest) (
 
 // DeleteScope issues DELETE /scopes/{id}. Requires Scopes:Delete.
 func (c *Client) DeleteScope(ctx context.Context, id string) error {
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return err
+	}
+	defer c.scopeMu.unlock()
+
 	return c.do(ctx, http.MethodDelete, scopePath(id), nil, nil)
 }

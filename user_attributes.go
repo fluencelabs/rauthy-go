@@ -93,9 +93,12 @@ const userAttrPathBase = "/users/attr"
 // under the lock, so the retry can overlap its own first attempt if that one
 // reached the server. A POST is not retried once it may have been sent.
 //
-// Reads are deliberately left unserialised — they do not mutate the list, and
-// blocking them would not make a concurrently corrupted list any more
-// accurate.
+// Reads are serialised too: a read that finds the cache empty stores the list
+// it selected, and Rauthy 0.37.2 empties the cache on every create, so a read
+// started before a create could store a list without the new attribute. A
+// write also takes Client.scopeMu, after userAttrMu: Rauthy edits the scopes' attribute
+// mappings and empties the scope cache on it, which a concurrent scope call
+// would otherwise overwrite with a stale list (see the note above scopePath).
 //
 // If a Rauthy release makes these writes atomic, the semaphore can go.
 
@@ -106,10 +109,14 @@ func userAttrPath(name string) string {
 // CreateUserAttr issues POST /users/attr. Requires the UserAttributes:Create
 // right.
 func (c *Client) CreateUserAttr(ctx context.Context, req UserAttrRequest) (*UserAttrResponse, error) {
-	if err := c.lockUserAttrs(ctx); err != nil {
+	if err := c.userAttrMu.lock(ctx); err != nil {
 		return nil, err
 	}
-	defer c.unlockUserAttrs()
+	defer c.userAttrMu.unlock()
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.scopeMu.unlock()
 
 	var out UserAttrResponse
 	if err := c.do(ctx, http.MethodPost, userAttrPathBase, req, &out); err != nil {
@@ -120,6 +127,11 @@ func (c *Client) CreateUserAttr(ctx context.Context, req UserAttrRequest) (*User
 
 // ListUserAttrs issues GET /users/attr. Requires UserAttributes:Read.
 func (c *Client) ListUserAttrs(ctx context.Context) ([]UserAttrResponse, error) {
+	if err := c.userAttrMu.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.userAttrMu.unlock()
+
 	var out userAttrListResponse
 	if err := c.do(ctx, http.MethodGet, userAttrPathBase, nil, &out); err != nil {
 		return nil, err
@@ -159,10 +171,14 @@ func (c *Client) GetUserAttr(ctx context.Context, name string) (*UserAttrRespons
 // does send one; it is discarded either way, and the caller reads the attribute
 // back rather than trusting it.
 func (c *Client) UpdateUserAttr(ctx context.Context, name string, req UserAttrRequest) error {
-	if err := c.lockUserAttrs(ctx); err != nil {
+	if err := c.userAttrMu.lock(ctx); err != nil {
 		return err
 	}
-	defer c.unlockUserAttrs()
+	defer c.userAttrMu.unlock()
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return err
+	}
+	defer c.scopeMu.unlock()
 
 	return c.do(ctx, http.MethodPut, userAttrPath(name), req, nil)
 }
@@ -170,19 +186,30 @@ func (c *Client) UpdateUserAttr(ctx context.Context, name string, req UserAttrRe
 // DeleteUserAttr issues DELETE /users/attr/{name}. Requires
 // UserAttributes:Delete.
 func (c *Client) DeleteUserAttr(ctx context.Context, name string) error {
-	if err := c.lockUserAttrs(ctx); err != nil {
+	if err := c.userAttrMu.lock(ctx); err != nil {
 		return err
 	}
-	defer c.unlockUserAttrs()
+	defer c.userAttrMu.unlock()
+	if err := c.scopeMu.lock(ctx); err != nil {
+		return err
+	}
+	defer c.scopeMu.unlock()
 
 	return c.do(ctx, http.MethodDelete, userAttrPath(name), nil, nil)
 }
 
-func (c *Client) lockUserAttrs(ctx context.Context) error {
+// writeLock is a context-aware mutex for a list Rauthy keeps as one cached
+// value and rewrites without locking. A caller waiting for it gives up when its
+// context ends.
+type writeLock chan struct{}
+
+func newWriteLock() writeLock { return make(writeLock, 1) }
+
+func (l writeLock) lock(ctx context.Context) error {
 	select {
-	case c.userAttrMu <- struct{}{}:
+	case l <- struct{}{}:
 		if err := ctx.Err(); err != nil {
-			c.unlockUserAttrs()
+			l.unlock()
 			return err
 		}
 		return nil
@@ -191,4 +218,4 @@ func (c *Client) lockUserAttrs(ctx context.Context) error {
 	}
 }
 
-func (c *Client) unlockUserAttrs() { <-c.userAttrMu }
+func (l writeLock) unlock() { <-l }
