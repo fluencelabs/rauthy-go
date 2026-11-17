@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1](https://github.com/fluencelabs/rauthy-go/compare/v0.3.0...v0.3.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **retry:** do not replay a PUT after a 500 ([7f2aafa](https://github.com/fluencelabs/rauthy-go/commit/7f2aafa68a769ade8a4d36f58705e9080a634eee))
+* **retry:** do not replay a PUT whose SCIM sync failed ([054b838](https://github.com/fluencelabs/rauthy-go/commit/054b838e38dfaa447a9633d8d7b62f2dd825329e))
+* **retry:** replay a PUT after any 500 except a failed SCIM sync ([85758d3](https://github.com/fluencelabs/rauthy-go/commit/85758d3af8e8b352d4c0f1e312cca065598e75cf))
+* serialise client updates with scope calls ([5c4c3c6](https://github.com/fluencelabs/rauthy-go/commit/5c4c3c64cabc6329ce62afa7591be97c316efe20))
+* serialise scope calls ([e07d7a7](https://github.com/fluencelabs/rauthy-go/commit/e07d7a72ad5474d9325b1b2c84c9afc2b14c49e1))
+* serialise scope reads and attribute writes with scope writes ([4f7ac38](https://github.com/fluencelabs/rauthy-go/commit/4f7ac38cc2168cfdce38307e7ab85a2a610acb95))
+* serialise scope writes ([87bf712](https://github.com/fluencelabs/rauthy-go/commit/87bf712b15128a611a767aee0fa3314cedb5b418))
+* serialise user attribute reads with the writes ([c3481f3](https://github.com/fluencelabs/rauthy-go/commit/c3481f3e395e82718e605fdc4c82b4fa54e0019e))
+
 ## [0.3.0](https://github.com/fluencelabs/rauthy-go/compare/v0.2.0...v0.3.0) (2026-11-17)
 
 
