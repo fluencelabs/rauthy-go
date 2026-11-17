@@ -82,16 +82,33 @@ no longer compiles. Keyed literals are unaffected.
 
 ### Known limits
 
-- If a response body is truncated, the SDK returns a read error instead of an
-  `APIError`. Status helpers such as `IsNotFound` cannot classify that error.
-- Cancellation or timeout releases the SDK's scope and user-attribute locks
-  while the server may still be processing the request. Locks cover only one
-  `Client`. Rauthy's logins, token requests and SCIM synchronization can refill
-  the scope cache outside those locks, so they cannot prevent every cache race.
-- Retrying a PUT after losing its response can hide a SCIM synchronization
-  failure: Rauthy saves the client before syncing, and an identical PUT may
-  succeed without repeating that sync. Rauthy retries recorded failed SCIM
-  tasks in the background, subject to its configured retry limit.
+- **Canceled mutations.** Canceling or timing out an in-flight scope or
+  user-attribute write releases the SDK locks while Rauthy may still be
+  processing it. Another call on the same `Client` can see stale scope cache
+  data. Let those writes finish during an apply. If one is interrupted,
+  re-read the affected state after the server has had time to finish.
+- **Client PUT and SCIM.** Rauthy can save a client update and then return
+  HTTP 500 (`Scim`) if group synchronization fails. A repeat PUT after a
+  lost response can succeed without running that sync again. Rauthy's
+  scheduler retries recorded tasks up to the configured limit. Check the
+  Rauthy logs and `failed_scim_tasks` for the sync outcome.
+  [SDK test for one request on HTTP 500](retry_round2_test.go#L189).
+- **Scope cache outside the SDK lock.** Rauthy logins, token requests and
+  SCIM can refill the scope cache, and separate SDK `Client` instances have
+  separate locks. Overlapping calls can leave stale scope or mapping data
+  in the cache. Serialize scope and user-attribute changes across applies
+  and re-read after suspected overlap.
+  [SDK test for serialization on one client](scopes_serial_test.go#L20).
+- **Truncated response bodies.** When a body read fails after the headers
+  arrive, the SDK keeps the HTTP status for retry decisions. If it returns
+  the read error, callers lose the error body and cannot classify the status
+  with helpers such as `IsNotFound`. Check server or proxy logs for the
+  status and re-read resource state before repeating a write.
+  [SDK test for retries on truncated responses](retry_round2_test.go#L302).
+- **Concurrent writers.** The Rauthy admin API has no conditional writes
+  with ETag / If-Match, so concurrent writers can overwrite each other's
+  changes. Assign one writer per resource or coordinate writes across
+  controllers and administrators.
 
 ### Validation
 
