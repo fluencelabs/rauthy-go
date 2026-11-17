@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -38,6 +39,42 @@ func TestPasswordUpdateIsNotReplayed(t *testing.T) {
 			}
 			if !errors.Is(err, io.ErrUnexpectedEOF) || calls.Load() != want {
 				t.Errorf("calls=%d want=%d err=%v", calls.Load(), want, err)
+			}
+		})
+	}
+}
+
+func TestPasswordUpdateIsNotReplayedAfterBadGateway(t *testing.T) {
+	t.Parallel()
+	for _, password := range []*rauthy.Secret{nil, new(rauthy.NewSecret("SYNTHETIC_PASSWORD"))} {
+		t.Run(strconv.FormatBool(password != nil), func(t *testing.T) {
+			t.Parallel()
+			var calls atomic.Int32
+			transport := retryRoundTripper(func(_ *http.Request) (*http.Response, error) {
+				calls.Add(1)
+				return &http.Response{
+					StatusCode: http.StatusBadGateway,
+					Header:     make(http.Header),
+					Body:       io.NopCloser(strings.NewReader(`{"message":"synthetic proxy failure"}`)),
+				}, nil
+			})
+			c, err := rauthy.New("https://auth.example.com", "key",
+				rauthy.WithHTTPClient(&http.Client{Transport: transport}),
+				rauthy.WithRetryPolicy(3, 0, 0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = c.UpdateUser(t.Context(), "user1", rauthy.UpdateUserRequest{Password: password})
+			want := int32(3)
+			if password != nil {
+				want = 1
+			}
+			var apiErr *rauthy.APIError
+			if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadGateway {
+				t.Errorf("expected original HTTP 502, got %v", err)
+			}
+			if calls.Load() != want {
+				t.Errorf("calls=%d want=%d", calls.Load(), want)
 			}
 		})
 	}

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -164,6 +166,35 @@ func TestTransportErrorOmitsBaseURL(t *testing.T) {
 		t.Fatalf("transport error repeats the base URL: %v", err)
 	}
 	if !errors.Is(err, context.Canceled) {
+		t.Errorf("error %v lost its cause", err)
+	}
+}
+
+func TestTransportEOFOmitsBaseURL(t *testing.T) {
+	t.Parallel()
+	const token = "SYNTHETICRESETTOKENSYNTHETICRESETTOKEN"
+	calls := 0
+	transport := retryRoundTripper(func(_ *http.Request) (*http.Response, error) {
+		calls++
+		return nil, io.ErrUnexpectedEOF
+	})
+	c, err := rauthy.New("https://auth.invalid/auth/v1/users/u1/reset/"+token, "key$secret",
+		rauthy.WithHTTPClient(&http.Client{Transport: transport}),
+		rauthy.WithRetryPolicy(1, 0, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.GetClient(t.Context(), "app")
+	if calls != 1 {
+		t.Fatalf("transport calls=%d want=1", calls)
+	}
+	if err == nil {
+		t.Fatal("GetClient with a failing transport succeeded")
+	}
+	if strings.Contains(err.Error(), token) {
+		t.Fatalf("transport error repeats the base URL: %v", err)
+	}
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Errorf("error %v lost its cause", err)
 	}
 }
