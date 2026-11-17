@@ -175,6 +175,9 @@ func TestUpdateAPIKey_SendsTheNameInTheBody(t *testing.T) {
 
 	var gotBody map[string]any
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/auth/v1/api_keys/deploy" {
+			t.Errorf("request = %s %s", r.Method, r.URL.Path)
+		}
 		raw, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(raw, &gotBody)
 		w.WriteHeader(http.StatusOK)

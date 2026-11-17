@@ -99,6 +99,12 @@ func TestUpdateClient_RoundTripPreservesEveryField(t *testing.T) {
 
 	puts := make(chan []byte, 1)
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/v1/clients/example-app" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodPut {
+			t.Errorf("method = %s", r.Method)
+		}
 		if r.Method == http.MethodPut {
 			b, _ := io.ReadAll(r.Body)
 			puts <- b
