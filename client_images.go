@@ -51,10 +51,10 @@ func clientImagePath(id string, kind ImageKind) (string, error) {
 
 // GetClientImage issues GET /clients/{id}/{logo,favicon}.
 //
-// A client with no such image and a client that does not exist are both a bare
-// 404 with an empty body, so callers cannot tell them apart from this endpoint
-// alone. Requires no special right beyond a valid key — the images are served
-// to the login page.
+// Rauthy returns a bare 404 for both a missing image and a missing client.
+// IsNotFound is false for that response because a missing route can return the
+// same status and body. The images are served to the login page and require no
+// special right beyond a valid key.
 func (c *Client) GetClientImage(ctx context.Context, id string, kind ImageKind) (*Image, error) {
 	path, err := clientImagePath(id, kind)
 	if err != nil {

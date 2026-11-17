@@ -2,6 +2,7 @@ package rauthy_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -169,11 +170,11 @@ func TestGetClientImageReturnsRawBytes(t *testing.T) {
 		t.Errorf("data = %q", got.Data)
 	}
 
-	// An absent image is a bare 404 with no error envelope, so IsNotFound has
-	// to work off the status alone.
+	// Rauthy returns the same bare 404 for a missing image or client.
 	_, missingErr := c.GetClientImage(context.Background(), "app", rauthy.ImageLogo)
-	if !rauthy.IsNotFound(missingErr) {
-		t.Fatalf("missing logo: got %v, want a not-found error", missingErr)
+	apiErr, ok := errors.AsType[*rauthy.APIError](missingErr)
+	if !ok || apiErr.StatusCode != http.StatusNotFound || rauthy.IsNotFound(missingErr) {
+		t.Fatalf("missing logo: got %v, want an unclassified HTTP 404 APIError", missingErr)
 	}
 }
 

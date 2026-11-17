@@ -22,6 +22,8 @@ type APIError struct {
 	Message string
 	// ErrorCode is Rauthy's `error` field, e.g. "NotFound", when present.
 	ErrorCode string
+
+	notFound bool
 }
 
 func (e *APIError) Error() string {
@@ -40,12 +42,21 @@ func newAPIError(method, path string, status int, raw []byte) *APIError {
 	e := &APIError{Method: method, Path: path, StatusCode: status}
 
 	var envelope struct {
-		Error   string `json:"error"`
-		Message string `json:"message"`
+		Timestamp json.RawMessage `json:"timestamp"`
+		Error     string          `json:"error"`
+		Message   *string         `json:"message"`
 	}
-	if err := json.Unmarshal(raw, &envelope); err == nil && (envelope.Message != "" || envelope.Error != "") {
+	if err := json.Unmarshal(raw, &envelope); err == nil && (envelope.Message != nil || envelope.Error != "") {
+		var message string
+		if envelope.Message != nil {
+			message = *envelope.Message
+		}
 		e.ErrorCode = envelope.Error
-		e.Message = safeAPIMessage(status, envelope.Error, envelope.Message)
+		e.Message = safeAPIMessage(status, envelope.Error, message)
+		if status == http.StatusNotFound && envelope.Error == "NotFound" && envelope.Message != nil {
+			var timestamp *int64
+			e.notFound = json.Unmarshal(envelope.Timestamp, &timestamp) == nil && timestamp != nil
+		}
 		return e
 	}
 
@@ -79,8 +90,12 @@ func newAPIError(method, path string, status int, raw []byte) *APIError {
 // does not mistake a duplicate for an absence.
 var ErrAmbiguousName = errors.New("name is ambiguous")
 
-// IsNotFound reports whether err is a 404 from the API.
-func IsNotFound(err error) bool { return hasStatus(err, http.StatusNotFound) }
+// IsNotFound reports whether err is an HTTP 404 with a Rauthy NotFound error
+// response or a missing object determined from a successful list.
+func IsNotFound(err error) bool {
+	apiErr, ok := errors.AsType[*APIError](err)
+	return ok && apiErr != nil && apiErr.notFound
+}
 
 // IsForbidden reports whether err is a 403 from the API. For this client a
 // 403 almost always means the API key is missing an access-group right rather
@@ -97,10 +112,7 @@ func hasStatus(err error, status int) bool {
 	return false
 }
 
-// notFoundError builds a synthetic 404 for endpoints Rauthy does not offer
-// per-id: roles and groups can only be listed, so "not there" is something the
-// client concludes rather than something the server says.
-// The endpoints in question are list endpoints, so the method is always GET.
+// notFoundError builds a synthetic 404 after a successful list lookup.
 func notFoundError(path, message string) *APIError {
 	return &APIError{
 		Method:     http.MethodGet,
@@ -108,6 +120,7 @@ func notFoundError(path, message string) *APIError {
 		StatusCode: http.StatusNotFound,
 		Message:    message,
 		ErrorCode:  "NotFound",
+		notFound:   true,
 	}
 }
 
