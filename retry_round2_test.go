@@ -183,3 +183,71 @@ func TestPasswordUpdateRetryMatrix(t *testing.T) {
 		})
 	}
 }
+
+// A PUT Rauthy stored before its SCIM sync failed answers 500 with error
+// "Scim"; a replay would answer 200 and hide the failure, so it is returned as
+// is. Any other 5xx on a PUT, a 500 from a lost database leader included, is
+// retried.
+func TestPutRetryOnServerErrors(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+		want   int32
+	}{
+		{"scim", http.StatusInternalServerError, `{"error":"Scim","message":"sync failed"}`, 1},
+		{"connection", http.StatusInternalServerError, `{"error":"Connection","message":"leader changed"}`, 2},
+		{"bad gateway", http.StatusBadGateway, `{"message":"proxy"}`, 2},
+		{"unavailable", http.StatusServiceUnavailable, `{"message":"proxy"}`, 2},
+		{"too many", http.StatusTooManyRequests, `{"message":"slow down"}`, 2},
+	} {
+		for _, call := range []string{"client", "group"} {
+			t.Run(tc.name+"/"+call, func(t *testing.T) {
+				t.Parallel()
+				calls, err := putAfterFailure(t, call, tc.status, tc.body)
+				if calls != tc.want {
+					t.Errorf("calls=%d want=%d", calls, tc.want)
+				}
+				var apiErr *rauthy.APIError
+				switch {
+				case tc.want == 1 && (!errors.As(err, &apiErr) || apiErr.ErrorCode != "Scim"):
+					t.Errorf("err = %v, want the Scim 500", err)
+				case tc.want > 1 && err != nil:
+					t.Errorf("err = %v, want success after the retry", err)
+				}
+			})
+		}
+	}
+}
+
+// putAfterFailure sends one PUT that first meets status with body, then 200,
+// and returns how many attempts reached the server.
+func putAfterFailure(t *testing.T, call string, status int, body string) (int32, error) {
+	t.Helper()
+	var calls atomic.Int32
+	transport := retryRoundTripper(func(*http.Request) (*http.Response, error) {
+		if calls.Add(1) == 1 {
+			return &http.Response{
+				StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)),
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"id":"x","name":"x"}`)),
+		}, nil
+	})
+	c, err := rauthy.New("https://auth.invalid", "key",
+		rauthy.WithHTTPClient(&http.Client{Transport: transport}),
+		rauthy.WithRetryPolicy(3, 0, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if call == "client" {
+		_, err = c.UpdateClient(t.Context(), "x", rauthy.UpdateClientRequest{ID: "x"})
+	} else {
+		_, err = c.UpdateGroup(t.Context(), "x", rauthy.GroupRequest{Group: "x"})
+	}
+	return calls.Load(), err
+}

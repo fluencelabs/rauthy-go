@@ -101,6 +101,9 @@ func (c *Client) send(
 				apiErr.Message = resp.redirect
 			}
 			lastErr = apiErr
+			if scimSyncFailed(method, apiErr) {
+				return nil, apiErr
+			}
 		}
 
 		if attempt >= c.retry.maxAttempts || !c.retryableRequest(method, path, body, status, err) {
@@ -186,7 +189,8 @@ func (c *Client) attempt(
 //
 // GET, PUT and DELETE are idempotent across this API — Rauthy's PUTs are full
 // replacements (except password changes) and its DELETEs answer the same way for an object that is
-// already gone — so they retry on every failure in the first list.
+// already gone — so they retry on every failure in the first list, except a
+// PUT whose SCIM sync failed after Rauthy stored it (see scimSyncFailed).
 //
 // POST is not, in general, and gets two narrow exemptions:
 //
@@ -240,6 +244,16 @@ func (c *Client) retryableRequest(method, path string, body []byte, status int, 
 		}
 	}
 	return c.retryable(method, path, status, err)
+}
+
+// scimSyncFailed reports a PUT that Rauthy stored before its SCIM sync failed.
+// A client update saves the SCIM settings, then syncs; a failed sync answers
+// 500 with error "Scim". A replay finds the settings already stored, skips the
+// sync, answers 200 and hides the failure, so it is not replayed. Other 500s,
+// such as a lost database leader, come before anything is stored and are
+// retried.
+func scimSyncFailed(method string, apiErr *APIError) bool {
+	return method == http.MethodPut && apiErr.ErrorCode == "Scim"
 }
 
 // secretRotationSuffix ends the path of every PUT that rotates a secret. An
