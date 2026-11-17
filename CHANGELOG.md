@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.3](https://github.com/fluencelabs/rauthy-go/compare/v0.3.2...v0.3.3) (2026-11-17)
+
+
+### Bug Fixes
+
+* classify bare client image read errors as not found ([2be4911](https://github.com/fluencelabs/rauthy-go/commit/2be4911a72e4443243bd5b662729521ea391dd13))
+* count a 404 as not found only when Rauthy says so ([799858f](https://github.com/fluencelabs/rauthy-go/commit/799858f9bbc2bdaa2eacf9d487a5a24d0c4eece4))
+* require Rauthy error body for not-found classification ([1cc8c72](https://github.com/fluencelabs/rauthy-go/commit/1cc8c72a9ffa7c9086af7f2a0b99df83dfcf1b42))
+
 ## [0.3.2](https://github.com/fluencelabs/rauthy-go/compare/v0.3.1...v0.3.2) (2026-11-17)
 
 
