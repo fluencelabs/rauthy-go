@@ -199,7 +199,7 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 	}
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL.Reveal()+path, body)
 	if err != nil {
-		return nil, fmt.Errorf("build %s %s: %w", method, path, err)
+		return nil, fmt.Errorf("build %s %s: %w", method, path, withoutBaseURL(err, path))
 	}
 	// Rauthy expects the key as `API-Key <name>$<secret>`.
 	req.Header.Set("Authorization", "API-Key "+c.apiKey.Reveal())

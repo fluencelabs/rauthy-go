@@ -10,6 +10,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -56,6 +57,16 @@ type rawResponse struct {
 // to one that failed on the wire. A malformed method or URL will not fix itself
 // on a second attempt, so it must not be mistaken for a transport failure.
 type buildError struct{ err error }
+
+// withoutBaseURL replaces the absolute URL a *url.Error repeats with the
+// request path. The base URL is a Secret: a mistaken one can carry a
+// credential in its path, and errors end up in logs.
+func withoutBaseURL(err error, path string) error {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
+		urlErr.URL = path
+	}
+	return err
+}
 
 func (e *buildError) Error() string { return e.err.Error() }
 
@@ -138,7 +149,7 @@ func (c *Client) attempt(
 		if isUnparseableLocation(err) {
 			return nil, &redirectError{method: method, path: path}
 		}
-		return nil, fmt.Errorf("%s %s: %w", method, path, err)
+		return nil, fmt.Errorf("%s %s: %w", method, path, withoutBaseURL(err, path))
 	}
 	defer func() { _ = resp.Body.Close() }()
 

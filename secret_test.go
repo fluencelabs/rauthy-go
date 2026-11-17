@@ -1,7 +1,9 @@
 package rauthy_test
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -141,5 +143,27 @@ func TestSecretDTOClassFormatting(t *testing.T) {
 		if !tested[name] {
 			t.Errorf("secret-bearing type %s has no formatting probe", name)
 		}
+	}
+}
+
+// A credential in the base URL path must not reach a transport error.
+func TestTransportErrorOmitsBaseURL(t *testing.T) {
+	t.Parallel()
+	const token = "SYNTHETICRESETTOKENSYNTHETICRESETTOKEN"
+	c, err := rauthy.New("https://auth.invalid/auth/v1/users/u1/reset/"+token, "key$secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = c.GetClient(ctx, "app")
+	if err == nil {
+		t.Fatal("GetClient with a canceled context succeeded")
+	}
+	if strings.Contains(err.Error(), token) {
+		t.Fatalf("transport error repeats the base URL: %v", err)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("error %v lost its cause", err)
 	}
 }
