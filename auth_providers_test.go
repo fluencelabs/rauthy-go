@@ -104,10 +104,33 @@ func TestGetAuthProvider_MissingIsNotFound(t *testing.T) {
 		_, _ = w.Write([]byte(oneProviderJSON))
 	})
 
-	if _, err := c.GetAuthProvider(context.Background(), "provider-1"); err != nil {
+	got, err := c.GetAuthProvider(context.Background(), "provider-1")
+	if err != nil {
 		t.Fatalf("GetAuthProvider: %v", err)
 	}
-	_, err := c.GetAuthProvider(context.Background(), "provider-nope")
+	for _, f := range []struct {
+		field     string
+		got, want any
+	}{
+		{"id", got.ID, "provider-1"},
+		{"name", got.Name, "Example IdP"},
+		{"typ", got.Typ, "oidc"},
+		{"enabled", got.Enabled, true},
+		{"issuer", got.Issuer, "https://idp.example.com"},
+		{"token_endpoint", got.TokenEndpoint, "https://idp.example.com/token"},
+		{"client_id", got.ClientID, "rauthy"},
+		{"scope", got.Scope, "openid+profile"},
+		{"use_pkce", got.UsePKCE, true},
+		{"client_secret_basic", got.ClientSecretBasic, true},
+	} {
+		if f.got != f.want {
+			t.Errorf("%s = %v, want %v", f.field, f.got, f.want)
+		}
+	}
+	if got.ClientSecret == nil || got.ClientSecret.Reveal() != "upstream-secret" {
+		t.Error("client_secret is not the listed provider's secret")
+	}
+	_, err = c.GetAuthProvider(context.Background(), "provider-nope")
 	if !rauthy.IsNotFound(err) {
 		t.Errorf("err = %v, want a synthetic 404", err)
 	}

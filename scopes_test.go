@@ -139,16 +139,28 @@ func TestGetScope_MissingScopeIsNotFound(t *testing.T) {
 			t.Errorf("got %s %s, want GET /auth/v1/scopes", r.Method, r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[{"id":"scope-1","name":"openid"}]`))
+		_, _ = w.Write([]byte(`[{"id":"scope-1","name":"openid",` +
+			`"attr_include_access":["email","groups"],"attr_include_id":["email"],"claims_at_root":true}]`))
 	})
 
-	if _, err := c.GetScope(context.Background(), "scope-1"); err != nil {
+	got, err := c.GetScope(context.Background(), "scope-1")
+	if err != nil {
 		t.Fatalf("GetScope: %v", err)
 	}
-	if _, err := c.GetScope(context.Background(), "scope-2"); !rauthy.IsNotFound(err) {
+	want := rauthy.ScopeResponse{
+		ID:                "scope-1",
+		Name:              "openid",
+		AttrIncludeAccess: rauthy.AttrList{"email", "groups"},
+		AttrIncludeID:     rauthy.AttrList{"email"},
+		ClaimsAtRoot:      true,
+	}
+	if !reflect.DeepEqual(*got, want) {
+		t.Errorf("GetScope = %+v, want %+v", *got, want)
+	}
+	if _, err = c.GetScope(context.Background(), "scope-2"); !rauthy.IsNotFound(err) {
 		t.Errorf("GetScope(missing) error = %v, want a 404", err)
 	}
-	if _, err := c.GetScopeByName(context.Background(), "nope"); !rauthy.IsNotFound(err) {
+	if _, err = c.GetScopeByName(context.Background(), "nope"); !rauthy.IsNotFound(err) {
 		t.Errorf("GetScopeByName(missing) error = %v, want a 404", err)
 	}
 }
