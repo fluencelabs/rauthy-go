@@ -162,7 +162,27 @@ func TestClientResponse_UpdateRequestSharesNoMemory(t *testing.T) {
 	req.Scim.BearerToken = rauthy.NewSecret("changed")
 	*req.Scim.GroupSyncPrefix = "changed"
 
-	again, _ := decodeFullClient(t)
+	again := rauthy.ClientResponse{
+		ID: "example-app", Name: new("Example App"), Enabled: true, Confidential: true,
+		RedirectURIs:           []string{"https://app.example.com/callback"},
+		PostLogoutRedirectURIs: []string{"https://app.example.com/"},
+		AllowedOrigins:         []string{"https://app.example.com"},
+		AllowedResources:       []string{"https://api.example.com"},
+		DefaultAud:             []string{"https://api.example.com/v1"},
+		FlowsEnabled:           []string{"authorization_code", "refresh_token"},
+		AccessTokenAlg:         "EdDSA", IDTokenAlg: "RS256",
+		AuthCodeLifetime: 60, AccessTokenLifetime: 600,
+		Scopes: []string{"openid", "profile"}, DefaultScopes: []string{"openid"},
+		Challenges: []string{"S256"}, ForceMFA: true,
+		ClientURI: new("https://app.example.com"), Contacts: []string{"ops@example.com"},
+		BackchannelLogoutURI: new("https://app.example.com/logout"),
+		RestrictGroupPrefix:  new("app:"),
+		Scim: &rauthy.ScimClientRequestResponse{
+			BearerToken: rauthy.NewSecret("scim-token"), BaseURI: "https://app.example.com/scim/v2",
+			SyncGroups: true, GroupSyncPrefix: new("app:"),
+		},
+		Claims: []byte(`{"tenant": "acme", "tier": 2}`), ClaimsAtRoot: true,
+	}
 	if !reflect.DeepEqual(got, again) {
 		t.Errorf("mutating the update request changed the response it was built from:\n%+v", got)
 	}
