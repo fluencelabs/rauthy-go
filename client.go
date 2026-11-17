@@ -13,7 +13,6 @@ import (
 	"net/textproto"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -29,11 +28,11 @@ type Client struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
-	// userAttrMu serialises writes to the user attribute definitions, which
+	// userAttrMu is a context-aware semaphore that serialises writes to the user attribute definitions, which
 	// Rauthy stores as one cached list and rewrites without locking. See the
 	// note above userAttrPathBase in user_attributes.go for what happens
 	// without it.
-	userAttrMu sync.Mutex
+	userAttrMu chan struct{}
 	// retry bounds how hard every request tries before giving up. See retry.go.
 	retry retryPolicy
 }
@@ -56,7 +55,7 @@ func WithHTTPClient(hc *http.Client) Option {
 // maxDelay. Only failures that are safe to repeat are retried (see retry.go).
 //
 // Retried are a 429, a 5xx and a transport failure such as a reset, for GET,
-// PUT and DELETE; a creating POST and a secret rotation only on a 429 or when nothing
+// PUT and DELETE; a creating POST, password update and secret rotation only on a 429 or when nothing
 // was sent. A request that timed out, on the http.Client timeout or the
 // caller's context, is never retried: it may still be running on the server.
 //
@@ -112,6 +111,7 @@ func New(rawURL, apiKey string, opts ...Option) (*Client, error) {
 
 	c := &Client{
 		baseURL:    base,
+		userAttrMu: make(chan struct{}, 1),
 		apiKey:     apiKey,
 		httpClient: &http.Client{Timeout: defaultTimeout, CheckRedirect: noRedirects},
 		retry: retryPolicy{

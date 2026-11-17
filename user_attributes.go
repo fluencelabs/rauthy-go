@@ -97,7 +97,7 @@ const userAttrPathBase = "/users/attr"
 // blocking them would not make a concurrently corrupted list any more
 // accurate.
 //
-// If a Rauthy release makes these writes atomic, the mutex can go.
+// If a Rauthy release makes these writes atomic, the semaphore can go.
 
 func userAttrPath(name string) string {
 	return userAttrPathBase + "/" + url.PathEscape(name)
@@ -106,8 +106,10 @@ func userAttrPath(name string) string {
 // CreateUserAttr issues POST /users/attr. Requires the UserAttributes:Create
 // right.
 func (c *Client) CreateUserAttr(ctx context.Context, req UserAttrRequest) (*UserAttrResponse, error) {
-	c.userAttrMu.Lock()
-	defer c.userAttrMu.Unlock()
+	if err := c.lockUserAttrs(ctx); err != nil {
+		return nil, err
+	}
+	defer c.unlockUserAttrs()
 
 	var out UserAttrResponse
 	if err := c.do(ctx, http.MethodPost, userAttrPathBase, req, &out); err != nil {
@@ -157,8 +159,10 @@ func (c *Client) GetUserAttr(ctx context.Context, name string) (*UserAttrRespons
 // does send one; it is discarded either way, and the caller reads the attribute
 // back rather than trusting it.
 func (c *Client) UpdateUserAttr(ctx context.Context, name string, req UserAttrRequest) error {
-	c.userAttrMu.Lock()
-	defer c.userAttrMu.Unlock()
+	if err := c.lockUserAttrs(ctx); err != nil {
+		return err
+	}
+	defer c.unlockUserAttrs()
 
 	return c.do(ctx, http.MethodPut, userAttrPath(name), req, nil)
 }
@@ -166,8 +170,25 @@ func (c *Client) UpdateUserAttr(ctx context.Context, name string, req UserAttrRe
 // DeleteUserAttr issues DELETE /users/attr/{name}. Requires
 // UserAttributes:Delete.
 func (c *Client) DeleteUserAttr(ctx context.Context, name string) error {
-	c.userAttrMu.Lock()
-	defer c.userAttrMu.Unlock()
+	if err := c.lockUserAttrs(ctx); err != nil {
+		return err
+	}
+	defer c.unlockUserAttrs()
 
 	return c.do(ctx, http.MethodDelete, userAttrPath(name), nil, nil)
 }
+
+func (c *Client) lockUserAttrs(ctx context.Context) error {
+	select {
+	case c.userAttrMu <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			c.unlockUserAttrs()
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (c *Client) unlockUserAttrs() { <-c.userAttrMu }
