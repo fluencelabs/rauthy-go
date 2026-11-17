@@ -4,10 +4,45 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"unicode/utf8"
 )
+
+func TestLiveNotFoundResponses(t *testing.T) {
+	t.Parallel()
+
+	for _, version := range []string{"0.36.2", "0.37.2"} {
+		t.Run(version, func(t *testing.T) {
+			t.Parallel()
+			raw, err := os.ReadFile("testdata/live-notfound-" + version + ".json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var responses []struct {
+				Method       string `json:"method"`
+				Path         string `json:"path"`
+				Status       int    `json:"status"`
+				Body         string `json:"body"`
+				WantNotFound bool   `json:"want_not_found"`
+			}
+			if decodeErr := json.Unmarshal(raw, &responses); decodeErr != nil {
+				t.Fatal(decodeErr)
+			}
+			if len(responses) == 0 {
+				t.Fatal("empty response fixture")
+			}
+			for _, response := range responses {
+				apiErr := newAPIError(response.Method, response.Path, response.Status, []byte(response.Body))
+				if got := IsNotFound(apiErr); got != response.WantNotFound {
+					t.Errorf("%s %s: IsNotFound(%v) = %t, want %t",
+						response.Method, response.Path, apiErr, got, response.WantNotFound)
+				}
+			}
+		})
+	}
+}
 
 func TestAPIErrorRejectedValues(t *testing.T) {
 	t.Parallel()

@@ -241,8 +241,9 @@ func TestNotFoundIsDetectable(t *testing.T) {
 	t.Parallel()
 
 	c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"error":"NotFound","message":"Client 'gone' not found"}`))
+		_, _ = w.Write([]byte(`{"timestamp":1700000000,"error":"NotFound","message":"Client 'gone' not found"}`))
 	})
 
 	_, err := c.GetClient(context.Background(), "gone")
@@ -251,6 +252,52 @@ func TestNotFoundIsDetectable(t *testing.T) {
 	}
 	if got, want := err.Error(), "GET /clients/gone: HTTP 404: Client 'gone' not found"; got != want {
 		t.Errorf("error = %q, want %q", got, want)
+	}
+}
+
+func TestHTTPErrorDoesNotProveObjectAbsence(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		status      int
+		contentType string
+		body        string
+	}{
+		{"plain route 404", http.StatusNotFound, "text/plain", "404 page not found\n"},
+		{"proxy JSON", http.StatusNotFound, "application/json", `{"status":404,"message":"no matching route"}`},
+		{"proxy with NotFound code", http.StatusNotFound, "application/json",
+			`{"error":"NotFound","message":"no route"}`},
+		{"other Rauthy code", http.StatusNotFound, "application/json",
+			`{"timestamp":1700000000,"error":"BadRequest","message":"invalid request"}`},
+		{"NotFound with wrong status", http.StatusForbidden, "application/json",
+			`{"timestamp":1700000000,"error":"NotFound","message":"object not found"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", tc.contentType)
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, tc.body)
+			})
+
+			_, readErr := c.GetClient(t.Context(), "app")
+			_, lookupErr := c.GetAuthProviderByName(t.Context(), "provider")
+			_, linkedErr := c.AuthProviderLinkedUsers(t.Context(), "provider")
+			for operation, err := range map[string]error{
+				"GetClient": readErr, "GetAuthProviderByName": lookupErr, "AuthProviderLinkedUsers": linkedErr,
+			} {
+				apiErr, ok := errors.AsType[*rauthy.APIError](err)
+				if !ok || apiErr.StatusCode != tc.status {
+					t.Errorf("%s: got %v, want APIError for HTTP %d", operation, err, tc.status)
+				}
+				if rauthy.IsNotFound(err) {
+					t.Errorf("%s: IsNotFound(%v) = true, want false", operation, err)
+				}
+			}
+		})
 	}
 }
 
