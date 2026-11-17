@@ -2,7 +2,6 @@ package rauthy_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"reflect"
 	"strings"
@@ -11,16 +10,10 @@ import (
 	"github.com/fluencelabs/rauthy-go"
 )
 
-// lookup adapts a Get* call to TestListLookupsReturnTheFoundRecord: it
-// decodes want independently of the client and requires the call to return
-// exactly that record, every field included.
-func lookup[T any](get func(context.Context, *rauthy.Client) (*T, error)) func(*testing.T, *rauthy.Client, string) {
-	return func(t *testing.T, c *rauthy.Client, wantJSON string) {
+// lookup compares every field against a literal independent of the wire tags.
+func lookup[T any](get func(context.Context, *rauthy.Client) (*T, error), want T) func(*testing.T, *rauthy.Client) {
+	return func(t *testing.T, c *rauthy.Client) {
 		t.Helper()
-		var want T
-		if err := json.Unmarshal([]byte(wantJSON), &want); err != nil {
-			t.Fatalf("decode the wanted record: %v", err)
-		}
 		if reflect.ValueOf(want).IsZero() {
 			t.Fatal("the wanted record is empty, so it cannot tell a found record from a zero one")
 		}
@@ -68,57 +61,56 @@ func TestListLookupsReturnTheFoundRecord(t *testing.T) {
 	cases := map[string]struct {
 		path  string
 		list  string
-		want  string
-		check func(*testing.T, *rauthy.Client, string)
+		check func(*testing.T, *rauthy.Client)
 	}{
-		"GetGroup": {"/auth/v1/groups", pair(group1, group2), group2,
+		"GetGroup": {"/auth/v1/groups", pair(group1, group2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.GroupResponse, error) {
 				return c.GetGroup(ctx, "group-2")
-			})},
-		"GetGroupByName": {"/auth/v1/groups", pair(group1, group2), group2,
+			}, rauthy.GroupResponse{ID: "group-2", Name: "developers", Meta: []byte(`{"b":2}`)})},
+		"GetGroupByName": {"/auth/v1/groups", pair(group1, group2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.GroupResponse, error) {
 				return c.GetGroupByName(ctx, "developers")
-			})},
-		"GetRole": {"/auth/v1/roles", pair(role1, role2), role2,
+			}, rauthy.GroupResponse{ID: "group-2", Name: "developers", Meta: []byte(`{"b":2}`)})},
+		"GetRole": {"/auth/v1/roles", pair(role1, role2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.RoleResponse, error) {
 				return c.GetRole(ctx, "role-2")
-			})},
-		"GetRoleByName": {"/auth/v1/roles", pair(role1, role2), role2,
+			}, rauthy.RoleResponse{ID: "role-2", Name: "operator", Meta: []byte(`{"b":2}`)})},
+		"GetRoleByName": {"/auth/v1/roles", pair(role1, role2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.RoleResponse, error) {
 				return c.GetRoleByName(ctx, "operator")
-			})},
-		"GetScope": {"/auth/v1/scopes", pair(scope1, scope2), scope2,
+			}, rauthy.RoleResponse{ID: "role-2", Name: "operator", Meta: []byte(`{"b":2}`)})},
+		"GetScope": {"/auth/v1/scopes", pair(scope1, scope2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.ScopeResponse, error) {
 				return c.GetScope(ctx, "scope-2")
-			})},
-		"GetScopeByName": {"/auth/v1/scopes", pair(scope1, scope2), scope2,
+			}, rauthy.ScopeResponse{ID: "scope-2", Name: "billing", AttrIncludeAccess: rauthy.AttrList{"email", "groups"}, AttrIncludeID: rauthy.AttrList{"email"}, ClaimsAtRoot: true})},
+		"GetScopeByName": {"/auth/v1/scopes", pair(scope1, scope2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.ScopeResponse, error) {
 				return c.GetScopeByName(ctx, "billing")
-			})},
-		"GetAuthProvider": {"/auth/v1/providers", pair(provider1, provider2), provider2,
+			}, rauthy.ScopeResponse{ID: "scope-2", Name: "billing", AttrIncludeAccess: rauthy.AttrList{"email", "groups"}, AttrIncludeID: rauthy.AttrList{"email"}, ClaimsAtRoot: true})},
+		"GetAuthProvider": {"/auth/v1/providers", pair(provider1, provider2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.AuthProviderResponse, error) {
 				return c.GetAuthProvider(ctx, "provider-1")
-			})},
-		"GetAuthProviderByName": {"/auth/v1/providers", pair(provider1, provider2), provider2,
+			}, oneProviderResponse())},
+		"GetAuthProviderByName": {"/auth/v1/providers", pair(provider1, provider2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.AuthProviderResponse, error) {
 				return c.GetAuthProviderByName(ctx, "Example IdP")
-			})},
-		"GetAPIKey": {"/auth/v1/api_keys", `{"keys":` + pair(key1, key2) + `}`, key2,
+			}, oneProviderResponse())},
+		"GetAPIKey": {"/auth/v1/api_keys", `{"keys":` + pair(key1, key2) + `}`,
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.APIKeyResponse, error) {
 				return c.GetAPIKey(ctx, "second")
-			})},
-		"GetBlacklistedIP": {"/auth/v1/blacklist", `{"ips":` + pair(ip1, ip2) + `}`, ip2,
+			}, rauthy.APIKeyResponse{Name: "second", Created: 1700000500, Expires: new(int64(4102444800)), Access: []rauthy.APIKeyAccess{{Group: "Users", AccessRights: []string{"read", "update"}}}})},
+		"GetBlacklistedIP": {"/auth/v1/blacklist", `{"ips":` + pair(ip1, ip2) + `}`,
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.BlacklistedIP, error) {
 				return c.GetBlacklistedIP(ctx, "203.0.113.2")
-			})},
-		"GetUserAttr": {"/auth/v1/users/attr", `{"values":` + pair(attr1, attr2) + `}`, attr2,
+			}, rauthy.BlacklistedIP{IP: "203.0.113.2", Exp: 4102444800})},
+		"GetUserAttr": {"/auth/v1/users/attr", `{"values":` + pair(attr1, attr2) + `}`,
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.UserAttrResponse, error) {
 				return c.GetUserAttr(ctx, "second")
-			})},
-		"GetPamGroup": {"/auth/v1/pam/groups", pair(pamGroup1, pamGroup2), pamGroup2,
+			}, rauthy.UserAttrResponse{Name: "second", Desc: new("two"), DefaultValue: []byte(`42`), UserEditable: true})},
+		"GetPamGroup": {"/auth/v1/pam/groups", pair(pamGroup1, pamGroup2),
 			lookup(func(ctx context.Context, c *rauthy.Client) (*rauthy.PamGroupResponse, error) {
 				return c.GetPamGroup(ctx, 100002)
-			})},
+			}, rauthy.PamGroupResponse{ID: 100002, Name: "developers", Typ: "generic"})},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -130,7 +122,7 @@ func TestListLookupsReturnTheFoundRecord(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(tc.list))
 			})
-			tc.check(t, c, tc.want)
+			tc.check(t, c)
 		})
 	}
 }

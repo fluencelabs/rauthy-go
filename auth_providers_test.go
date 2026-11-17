@@ -22,6 +22,19 @@ const oneProviderJSON = `[{"id":"provider-1","name":"Example IdP","typ":"oidc","
 	`"use_pkce":true,"client_secret_basic":true,"client_secret_post":false,` +
 	`"auto_onboarding":false,"auto_link":false}]`
 
+// oneProviderResponse is the literal expectation for oneProviderJSON.
+func oneProviderResponse() rauthy.AuthProviderResponse {
+	return rauthy.AuthProviderResponse{
+		ID: "provider-1", Name: "Example IdP", Typ: "oidc", Enabled: true,
+		Issuer:                "https://idp.example.com",
+		AuthorizationEndpoint: "https://idp.example.com/authorize",
+		TokenEndpoint:         "https://idp.example.com/token",
+		UserinfoEndpoint:      "https://idp.example.com/userinfo",
+		ClientID:              "rauthy", ClientSecret: new(rauthy.NewSecret("upstream-secret")),
+		Scope: "openid+profile", UsePKCE: true, ClientSecretBasic: true,
+	}
+}
+
 // The two verbs are easy to transpose, and transposing them is not a compile
 // error: creation is POST /providers/create, and POST /providers is the list.
 func TestCreateAuthProvider_PostsToProvidersCreate(t *testing.T) {
@@ -223,7 +236,22 @@ func TestAuthProviderLookupsPreserveOptionalFields(t *testing.T) {
 		`"auto_onboarding":false`, `"auto_onboarding":true`,
 		`"auto_link":false`, `"auto_link":true`,
 	).Replace(oneProviderJSON)
-	for fixture, list := range map[string]string{"null and false": oneProviderJSON, "populated and true": rich} {
+	richWant := oneProviderResponse()
+	richWant.JwksEndpoint = new("https://idp.example.com/jwks")
+	richWant.AdminClaimPath = new("roles.admin")
+	richWant.AdminClaimValue = new("administrator")
+	richWant.MfaClaimPath = new("amr")
+	richWant.MfaClaimValue = new("mfa")
+	richWant.ClientSecretPost = true
+	richWant.AutoOnboarding = true
+	richWant.AutoLink = true
+	for fixture, tc := range map[string]struct {
+		list string
+		want rauthy.AuthProviderResponse
+	}{
+		"null and false":     {oneProviderJSON, oneProviderResponse()},
+		"populated and true": {rich, richWant},
+	} {
 		for method, get := range map[string]func(context.Context, *rauthy.Client) (*rauthy.AuthProviderResponse, error){
 			"by id": func(ctx context.Context, c *rauthy.Client) (*rauthy.AuthProviderResponse, error) {
 				return c.GetAuthProvider(ctx, "provider-1")
@@ -235,12 +263,12 @@ func TestAuthProviderLookupsPreserveOptionalFields(t *testing.T) {
 			t.Run(fixture+"/"+method, func(t *testing.T) {
 				t.Parallel()
 				other := `{"id":"other","name":"Other IdP"}`
-				wanted := strings.TrimSuffix(strings.TrimPrefix(list, "["), "]")
+				wanted := strings.TrimSuffix(strings.TrimPrefix(tc.list, "["), "]")
 				c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					_, _ = w.Write([]byte("[" + other + "," + wanted + "," + other + "]"))
 				})
-				lookup(get)(t, c, wanted)
+				lookup(get, tc.want)(t, c)
 			})
 		}
 	}
