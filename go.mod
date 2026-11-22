@@ -3,7 +3,7 @@ module github.com/fluencelabs/rauthy-go
 go 1.27.4
 
 require (
-	github.com/pb33f/libopenapi v0.42.5
+	github.com/pb33f/libopenapi v0.43.1
 	github.com/pb33f/libopenapi-validator v0.16.3
 )
 
